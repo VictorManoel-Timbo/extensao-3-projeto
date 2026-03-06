@@ -1,2 +1,2 @@
 # Nome do Projeto
-O seguinte projeto foi desenvolvido usando os frameworks *Django* e *Tailwind CSS*. Este projeto tem como objetivo desenvolver uma ferramenta de IA inovadora e disruptiva para o auxilio da identificação de alergênicos em alimentos.
+O seguinte projeto foi desenvolvido usando os frameworks **Django** e **Tailwind CSS**. Este projeto tem como objetivo desenvolver uma ferramenta de IA inovadora e disruptiva para o auxilio da identificação de alergênicos em alimentos.
