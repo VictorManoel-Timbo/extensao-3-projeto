@@ -28,12 +28,20 @@ Antes de começar, certifique-se de ter as seguintes ferramentas instaladas na s
    POSTGRES_USER=postgres
    POSTGRES_PASSWORD=sua_senha_segura
 
-3. **Iniciando o Container:**
+3. **Configuração do Git:**
+   Para que o container não perca a sua identidade do Git a cada rebuild, nós utilizamos um script de inicialização (`setup.sh`).
+   Crie um arquivo chamado `.git_config` dentro da pasta `.envs/.local/` com o seguinte formato:
+   *Exemplo de `.envs/.local/.git_config`:*
+   GIT_USER_NAME="Seu Nome Completo"
+   GIT_USER_EMAIL="<seu_email@exemplo.com>"
+   *(Nota: A pasta `.envs/` é ignorada pelo Git, mantendo seus dados seguros apenas na sua máquina local).*
+
+4. **Iniciando o Container:**
    - Abra a pasta do projeto no VS Code.
    - Pressione `F1` (ou `Ctrl+Shift+P`), digite **`Dev Containers: Reopen in Container`** e aperte Enter.
    - O VS Code começará a construir a imagem Docker. A primeira vez pode demorar alguns minutos.
 
-4. **Rodando o Servidor Django:**
+5. **Rodando o Servidor Django:**
    Dentro do terminal integrado do VS Code (que já estará dentro do Linux/Container), rode:
    `python manage.py runserver 0.0.0.0:8000`
    O app estará acessível no seu navegador em: `http://localhost:8000`
@@ -50,5 +58,5 @@ Para evitar que seus commits sejam bloqueados na hora de enviar, é uma boa prá
 
 `pre-commit run --all-files`
 
-- Se a ferramenta encontrar erros ou arquivos fora do padrão, **ela corrigirá a maioria deles automaticamente**. 
+- Se a ferramenta encontrar erros ou arquivos fora do padrão, **ela corrigirá a maioria deles automaticamente**.
 - Após a correção, os arquivos aparecerão como modificados. Basta adicioná-los novamente (`git add .`) e refazer o commit.
