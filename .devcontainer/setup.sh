@@ -11,7 +11,7 @@ if [ -f "$ENV_GIT" ]; then
     git config --global user.name "$GIT_USER_NAME"
     git config --global user.email "$GIT_USER_EMAIL"
 
-    echo "✅ Git configurado lendo o arquivo .env exclusivo!"
+    echo "Git configurado com sucesso!"
 else
-    echo "⚠️ Arquivo $ENV_GIT não encontrado!"
+    echo "[ERRO] Arquivo $ENV_GIT não encontrado!"
 fi
