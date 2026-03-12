@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class FoodguardConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'foodguard.core'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "foodguard.core"

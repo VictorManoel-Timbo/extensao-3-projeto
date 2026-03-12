@@ -45,7 +45,7 @@ DJANGO_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.forms"
+    "django.forms",
 ]
 
 THIRD_PARTY_APPS = [
@@ -61,9 +61,7 @@ THIRD_PARTY_APPS = [
     "django_browser_reload",
 ]
 
-LOCAL_APPS = [
-    "foodguard.core"
-]
+LOCAL_APPS = ["foodguard.core"]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
@@ -75,7 +73,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    'allauth.account.middleware.AccountMiddleware',
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
