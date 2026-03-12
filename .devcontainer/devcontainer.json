@@ -1,5 +1,5 @@
 {
-    "name": "Django Dev Container",
+    "name": "FoodGuard",
     "dockerComposeFile": [
         "../docker-compose.local.yml"
     ],
@@ -31,7 +31,6 @@
                     "editor.codeActionsOnSave": {
                         "source.organizeImports": "always"
                     },
-                    "editor.defaultFormatter": "charliermarsh.ruff",
                     "languageServer": "Pylance",
                     "linting.enabled": true,
                     "linting.mypyEnabled": true,
@@ -47,25 +46,16 @@
                 }
             },
             "extensions": [
-                "davidanson.vscode-markdownlint",
-                "mrmlnc.vscode-duplicate",
-                "visualstudioexptteam.vscodeintellicode",
-                "visualstudioexptteam.intellicode-api-usage-examples",
                 "ms-python.python",
-                "ms-python.vscode-pylance",
-                "charliermarsh.ruff",
-                "batisteo.vscode-django",
-                "bradlc.vscode-tailwindcss",
-                "esbenp.prettier-vscode",
-                "dsznajder.es7-react-js-snippets",
-                "ms-vscode.vscode-typescript-next",
-                "monosans.djlint",
-                "vivaxy.vscode-conventional-commits",
-                "donjayamanne.githistory",
-                "mhutchie.git-graph",
                 "ms-python.debugpy",
-                "humao.rest-client",
-                "saoudrizwan.claude-dev"
+                "batisteo.vscode-django",
+                "cweijan.vscode-postgresql-client2",
+                "cweijan.dbclient-jdbc",
+                "eamodio.gitlens",
+                "thebarkman.vscode-djaneiro",
+                "bibhasdn.django-html",
+                "esbenp.prettier-vscode",
+                "bradlc.vscode-tailwindcss"
             ]
         }
     },
