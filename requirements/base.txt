@@ -29,3 +29,5 @@ django-unfold==0.51.0
 # Development tools
 # ------------------------------------------------------------------------------
 django-browser-reload==1.11.0  # https://github.com/timonweb/django-browser-reload
+django-tailwind-cli==4.5.1  # https://github.com/django-commons/django-tailwind-cli
+
