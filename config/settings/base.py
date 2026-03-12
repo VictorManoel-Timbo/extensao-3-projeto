@@ -51,6 +51,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     "crispy_forms",
     "crispy_tailwind",
+    "django_tailwind_cli",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
