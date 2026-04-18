@@ -22,26 +22,32 @@ class Anamnese(models.Model):
 
     previous_consultation_objective = models.TextField(
         blank=True, null=True, 
+        max_length=5000,
         verbose_name="Qual era o objetivo na época?"
     )
     previous_consultation_result = models.TextField(
         blank=True, null=True, 
+        max_length=5000,
         verbose_name="Obteve resultado? Se sim, qual?"
     )
     disease_history = models.TextField(
         blank=True, null=True, 
+        max_length=5000,
         verbose_name="Histórico de doenças? Se sim, quais?"
     )
     medications = models.TextField(
         blank=True, null=True, 
+        max_length=5000,
         verbose_name="Faz uso de algum medicamento? Se sim, qual?"
     )
     favorite_foods = models.TextField(
         blank=True, null=True, 
+        max_length=5000,
         verbose_name="Alimentos que você gosta de comer e não podem faltar"
     )
     food_aversions = models.TextField(
         blank=True, null=True, 
+        max_length=5000,
         verbose_name="Aversões/Tabus Alimentares/Alimentos que não gosta"
     )
 
