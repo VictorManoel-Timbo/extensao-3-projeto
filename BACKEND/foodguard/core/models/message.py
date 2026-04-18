@@ -22,3 +22,7 @@ class Message(BaseModel):
     content = models.TextField(
         max_length=5000
     )
+
+    class Meta:
+        verbose_name = "Mensagem"
+        verbose_name_plural = "Mensagens"
