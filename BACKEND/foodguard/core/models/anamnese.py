@@ -90,8 +90,8 @@ class Anamnese(models.Model):
     )
 
     class Meta:
-        verbose_name = "Anamnese Nutricional"
-        verbose_name_plural = "Anamneses Nutricionais"
+        verbose_name = "Formulário de Anamnese"
+        verbose_name_plural = "Formulários de Anamnese"
 
     def clean(self):
         super().clean()
