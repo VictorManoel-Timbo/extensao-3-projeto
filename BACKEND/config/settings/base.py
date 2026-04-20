@@ -58,8 +58,6 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
-    "drf_spectacular",
-    "django_browser_reload",
 ]
 
 LOCAL_APPS = ["foodguard.core", "foodguard.users"]
@@ -202,3 +200,12 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = ["tailwind"]
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# REST Framework
+# https://www.django-rest-framework.org/api-guide/settings/
+
+# https://www.django-rest-framework.org/api-guide/pagination/#setting-the-pagination-style
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
+    'PAGE_SIZE': 20,
+}
