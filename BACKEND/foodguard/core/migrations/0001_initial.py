@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Anamnese',
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('id', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False, verbose_name='ID')),
                 ('previous_consultation', models.BooleanField(default=False, verbose_name='Já fez consulta prévia com nutricionista?')),
                 ('alcohol_intake', models.BooleanField(default=False, verbose_name='Ingestão de Álcool')),
                 ('smoking', models.BooleanField(default=False, verbose_name='Fumo')),

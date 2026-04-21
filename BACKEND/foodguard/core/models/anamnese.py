@@ -2,7 +2,11 @@ from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 
-class Anamnese(models.Model):
+from foodguard.core.models.base import BaseModel
+from foodguard.core.models.chat import Chat
+
+
+class Anamnese(BaseModel):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -111,4 +115,8 @@ class Anamnese(models.Model):
         if errors:
             raise ValidationError(errors)
 
-    
+    def save(self, *args, **kwargs):
+        if self.pk:
+            Chat.objects.filter(user=self.user).update(is_active=False)
+
+        super().save(*args, **kwargs)
