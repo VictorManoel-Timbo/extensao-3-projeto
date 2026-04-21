@@ -114,9 +114,3 @@ class Anamnese(BaseModel):
 
         if errors:
             raise ValidationError(errors)
-
-    def save(self, *args, **kwargs):
-        if self.pk:
-            Chat.objects.filter(user=self.user).update(is_active=False)
-
-        super().save(*args, **kwargs)
