@@ -3,10 +3,10 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 
 class Anamnese(models.Model):
-    user = models.ForeignKey(
+    user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name='anamneses'
+        related_name='anamnese'
     )
     previous_consultation = models.BooleanField(
         default=False, 
@@ -110,3 +110,5 @@ class Anamnese(models.Model):
 
         if errors:
             raise ValidationError(errors)
+
+    
