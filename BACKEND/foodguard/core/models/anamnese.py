@@ -25,32 +25,24 @@ class Anamnese(BaseModel):
         verbose_name="Fumo"
     )
 
-    is_previous_consultation = models.BooleanField(
-        default=False
-    )
     previous_consultation_objective = models.TextField(
         blank=True, null=True,
         max_length=5000,
         verbose_name="Qual era o objetivo na época?"
     )
+
     previous_consultation_result = models.TextField(
         blank=True, null=True, 
         max_length=5000,
         verbose_name="Obteve resultado? Se sim, qual?"
     )
 
-    is_disease_history = models.BooleanField(
-        default=False
-    )
     disease_history = models.TextField(
         blank=True, null=True, 
         max_length=5000,
         verbose_name="Histórico de doenças? Se sim, quais?"
     )
 
-    is_medication_use = models.BooleanField(
-        default=False
-    )
     medications = models.TextField(
         blank=True, null=True, 
         max_length=5000,
@@ -61,6 +53,7 @@ class Anamnese(BaseModel):
         max_length=5000,
         verbose_name="Alimentos que você gosta de comer e não podem faltar"
     )
+
     food_aversions = models.TextField(
         blank=True, null=True, 
         max_length=5000,
@@ -93,24 +86,7 @@ class Anamnese(BaseModel):
         verbose_name="Estilo de alimentação"
     )
 
-    class Meta:
-        verbose_name = "Formulário de Anamnese"
-        verbose_name_plural = "Formulários de Anamnese"
-
     def clean(self):
-        super().clean()
-        
-        errors = {}
-
-        if self.is_previous_consultation:
+        if self.previous_consultation:
             if not self.previous_consultation_objective:
-                errors['previous_consultation_objective'] = "Este campo é obrigatório pois você marcou que já houve consulta prévia."
-            
-        if self.is_disease_history and not self.disease_history:
-            errors['disease_history'] = "Por favor, informe o histórico de doenças."
-
-        if self.is_medication_use and not self.medications:
-            errors['medications'] = "Por favor, informe quais medicamentos você utiliza."
-
-        if errors:
-            raise ValidationError(errors)
+                raise ValidationError("O campo 'Qual era o objetivo na época?' é obrigatório quando 'Já fez consulta prévia com nutricionista?' é marcado como sim.")
