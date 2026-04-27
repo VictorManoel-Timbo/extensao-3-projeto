@@ -61,7 +61,7 @@
     "postCreateCommand": "bash .devcontainer/setup.sh",
     "features": {
         "ghcr.io/devcontainers/features/node:1": {
-            "version": "18"
+            "version": "21"
         }
     }
 }
