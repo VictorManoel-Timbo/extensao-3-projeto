@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework.generics import CreateAPIView
 from rest_framework.generics import ListAPIView
 from django.shortcuts import get_object_or_404
@@ -8,6 +9,11 @@ from foodguard.core.models.chat import Chat
 from foodguard.api.exceptions.chat import ChatClosedException
 from foodguard.api.exceptions.message import RoleNotAllowedException
 
+@extend_schema(
+    summary="Cria uma nova mensagem de chat", 
+    description="Este endpoint recebe um texto e processa a resposta usando o modelo Gemini.", 
+    responses={201: str}
+    )
 class MessageCreateAPIView(CreateAPIView):
     serializer_class = MessageSerializer
 
@@ -29,6 +35,7 @@ class MessageCreateAPIView(CreateAPIView):
 
         serializer.save(chat=chat)
 
+@extend_schema(summary="Lista mensagens de um chat específico do usuário")
 class MessageListAPIView(ListAPIView):
     serializer_class = MessageSerializer
 
