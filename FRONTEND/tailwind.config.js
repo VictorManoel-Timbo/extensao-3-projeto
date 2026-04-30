@@ -25,7 +25,10 @@ export default {
           900: '#00402A',
           950: '#001E14'
         }
-      }
+      },
+      fontFamily: {
+        sansita: ['"Sansita"', 'sans-serif'],
+      },
     },
   },
   plugins: [],
