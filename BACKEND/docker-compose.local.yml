@@ -1,6 +1,7 @@
 volumes:
   foodguard_local_postgres_data: {}
   foodguard_local_postgres_data_backups: {}
+  ollama_data: {}
 
 services:
   django:
@@ -34,3 +35,15 @@ services:
       - "5432:5432"
     environment:
       - TZ=America/Fortaleza
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: foodguard_local_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./compose/local/ollama/entrypoint.sh:/entrypoint.sh
+    env_file:
+      - ./.envs/.local/.ollama
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]

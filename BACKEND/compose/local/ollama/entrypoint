@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -e
+
+ollama serve &
+
+echo "Aguardando Ollama iniciar na porta ${OLLAMA_PORT}..."
+until curl -s http://localhost:${OLLAMA_PORT}/api/tags > /dev/null; do
+  sleep 2
+done
+
+echo "Verificando/Baixando o modelo: ${OLLAMA_MODEL}..."
+ollama pull ${OLLAMA_MODEL}
+
+echo "Ollama está pronto com o modelo ${OLLAMA_MODEL}!"
+
+wait
