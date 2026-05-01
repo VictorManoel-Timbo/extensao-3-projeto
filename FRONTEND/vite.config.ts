@@ -19,6 +19,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: path => path.replace(/^\/api/, "")
         },
+        '/openfood': {
+          target: process.env.VITE_OPENFOOD_URL,
+          changeOrigin: true,
+          rewrite: path => path.replace(/^\/openfood/, "")
+        }
       },
     },
   })

@@ -12,19 +12,19 @@ const NavBar = () => {
         <header className="pt-6">
             <div className="flex max-w-6xl items-center gap-4">
                 <div className="flex flex-1 items-center justify-between rounded-full border border-zinc-500 bg-white pl-6 pr-8 py-3 shadow-sm shadow-black/15">
-                    <h1 className="font-sansita text-4xl font-extrabold tracking-tight text-foreground">
+                    <h1 className="font-sansita text-4xl font-extrabold tracking-tight text-black">
                         FoodGuard
                     </h1>
                     <nav className="flex items-center gap-16">
                         <a
                             href="#como-funciona"
-                            className="text-base font-semibold text-foreground transition-colors hover:text-foodguard-500"
+                            className="text-base font-semibold text-black transition-colors hover:text-foodguard-500"
                         >
                             Como funciona?
                         </a>
                         <a
                             href="#quem-somos"
-                            className="text-base font-semibold text-foreground transition-colors hover:text-foodguard-500"
+                            className="text-base font-semibold text-black transition-colors hover:text-foodguard-500"
                         >
                             Quem somos
                         </a>
@@ -32,9 +32,9 @@ const NavBar = () => {
                 </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <div className="flex items-center justify-center bg-red-500/20 rounded-full p-4 max-w-14 max-h-14 shadow-sm shadow-black/15 cursor-default"
+                        <div className="flex items-center justify-center bg-red-500/20 rounded-full p-4 max-w-14 max-h-14 shadow-sm shadow-black/15 cursor-pointer"
                             aria-label="Perfil de usuário">
-                            <FiUser className="text-2xl text-red-500" />
+                            <FiUser className="text-4xl text-red-500 font-extrabold" />
                         </div>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="bg-white border border-zinc-500 font-medium">
