@@ -10,12 +10,6 @@ class Message(BaseModel):
     class Role(models.TextChoices):
         USER = 'U', _('Usuário')
         ASSISTANT = 'A', _('Assistente')
-
-    class Status(models.TextChoices):
-        CRIADA = 1, _('Criada')        
-        PROCESSANDO = 2, _('Processando')
-        CONCLUIDA = 3, _('Concluída')
-        FALHA = 4, _('Falha')
     
     chat = models.ForeignKey(
         Chat,
@@ -25,10 +19,6 @@ class Message(BaseModel):
     role = models.CharField(
         max_length=10,
         choices=Role.choices
-    )
-    status = models.IntegerField(
-        choices=Status.choices,
-        default=Status.CRIADA
     )
     content = models.TextField(
         max_length=5000
