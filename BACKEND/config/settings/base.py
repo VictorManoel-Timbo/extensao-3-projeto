@@ -215,7 +215,7 @@ REST_FRAMEWORK = {
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "default_api_key")
 GEMINI_MODEL_NAME = "gemini-2.5-flash"
 GEMINI_TEMPERATURE = 0.7
-GEMINI_SYSTEM_PROMPT = "Você é um assistente técnico prestativo e conciso."
+SYSTEM_PROMPT_PATH = os.path.join(BASE_DIR, "data", "system_prompt.md")
 
 # LOGGER CONFIGURATION
 # settings.py
