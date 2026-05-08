@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import environ
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -208,4 +209,37 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 20,
+}
+
+# Gemini API
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "default_api_key")
+GEMINI_MODEL_NAME = "gemini-2.5-flash"
+GEMINI_TEMPERATURE = 0.7
+SYSTEM_PROMPT_PATH = os.path.join(BASE_DIR, "data", "system_prompt.md")
+
+# LOGGER CONFIGURATION
+# settings.py
+import os
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
 }
