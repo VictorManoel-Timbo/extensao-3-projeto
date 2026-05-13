@@ -30,7 +30,7 @@ const Sidebar = ({
             <button
                 onClick={onToggle}
                 aria-label={open ? "Fechar menu" : "Abrir menu"}
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-black hover:bg-slate-100"
+                className="flex h-10 w-10 items-center justify-center rounded-lg text-black hover:bg-slate-200"
             >
                 <Menu className="h-6 w-6" strokeWidth={2.5} />
             </button>
@@ -38,13 +38,13 @@ const Sidebar = ({
             <button
                 onClick={onNewChat}
                 className={cn(
-                    "mt-4 flex items-center rounded-lg text-black hover:bg-slate-100",
+                    "mt-4 flex items-center rounded-lg text-black hover:bg-slate-200",
                     open ? "w-full gap-3 px-2 py-2" : "h-10 w-10 justify-center"
                 )}
                 aria-label="Nova conversa"
             >
                 <SquarePen className="h-6 w-6 shrink-0" strokeWidth={2.2} />
-                {open && <span className="text-base font-medium">Nova conversa</span>}
+                {open && <span className="text-base font-medium truncate">Nova conversa</span>}
             </button>
 
             {open && (
@@ -60,10 +60,10 @@ const Sidebar = ({
                                     <button
                                         onClick={() => onSelect(c.id)}
                                         className={cn(
-                                            "group flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-semibold transition-colors",
+                                            "group flex w-full cursor-default items-center justify-between rounded-lg px-3 py-2 text-left font-semibold transition-colors",
                                             active
                                                 ? "bg-foodguard-500 text-white"
-                                                : "text-black hover:bg-slate-100"
+                                                : "text-black hover:bg-slate-200"
                                         )}
                                     >
                                         <span className="truncate">{c.title}</span>

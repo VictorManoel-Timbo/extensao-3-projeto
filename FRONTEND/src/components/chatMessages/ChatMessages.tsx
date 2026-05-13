@@ -44,7 +44,7 @@ const ChatMessages = ({ messages }: { messages: Message[] }) => {
                                 </div>
                             )}
                             {m.text && (
-                                <div className="max-w-[80%] rounded-2xl rounded-se border border-zinc-400 bg-foodguard-500 p-4 text-white shadow shadow-black/15">
+                                <div className="max-w-[80%] rounded-2xl rounded-se border border-zinc-400 bg-foodguard-500 p-4 text-white whitespace-break-spaces shadow shadow-black/15">
                                     {m.text}
                                 </div>
                             )}
