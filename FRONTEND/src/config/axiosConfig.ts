@@ -34,7 +34,7 @@ function initAxios(config: AxiosRequestConfig, token?: any): AxiosInstance {
   return defineInstance;
 }
 
-function api(baseURL = "http://localhost:8000/api", token?: any) {
+function api(baseURL = "/api", token?: any) {
   return initAxios(apiConfig(baseURL), token);
 }
 
