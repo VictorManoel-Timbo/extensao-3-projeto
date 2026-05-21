@@ -1,4 +1,4 @@
-export type MessageRole = "U" | "A";
+import { type MessageRole } from "@/enums/MessageRole";
 
 export interface Message {
   chat_id: string;
