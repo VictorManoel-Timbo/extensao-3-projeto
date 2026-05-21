@@ -1,13 +1,14 @@
-import api from "@/config/api";
-import type { Chat, PaginatedResponse } from "@/models/chat.model";
+import { chatRest } from "./rest/chat.rest"
+import type { Chat } from "@/models/chat.model"
 
-const BASE_URL = "/chats/";
+export const chatService = {
 
-export async function listChats(): Promise<Chat[]> {
-  const response = await api.get<PaginatedResponse<Chat>>(BASE_URL);
-  return response.results;
-}
+    listar: async (): Promise<Chat[]> => {
+        const response = await chatRest.getChats()
+        return response.results
+    },
 
-export async function deleteChat(chatId: string): Promise<void> {
-  return api.delete<void>(`${BASE_URL}${chatId}/`);
+    deletar: async (chatId: string): Promise<void> => {
+        return chatRest.deleteChat(chatId)
+    }
 }
