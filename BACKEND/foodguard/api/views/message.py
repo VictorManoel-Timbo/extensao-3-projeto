@@ -1,26 +1,90 @@
 import logging
-from drf_spectacular.utils import extend_schema
-from rest_framework import status
-from rest_framework.generics import CreateAPIView
-from rest_framework.generics import ListAPIView
-from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
 
-from foodguard.api.serializers.message import MessageSerializer
-from foodguard.core.models.message import Message
-from foodguard.core.models.chat import Chat
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
+from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.response import Response
+
 from foodguard.api.exceptions.chat import ChatClosedException
 from foodguard.api.exceptions.message import RoleNotAllowedException
+from foodguard.api.serializers.message import MessageSerializer
+from foodguard.core.models.anamnese import Anamnese
+from foodguard.core.models.chat import Chat
+from foodguard.core.models.message import Message
 from foodguard.core.services.gemini_client import GeminiClient
 
 gemini_client = GeminiClient()
 logger = logging.getLogger('django')
 
-@extend_schema(
-    summary="Cria uma nova mensagem de chat", 
-    description="Este endpoint recebe um texto e processa a resposta usando o modelo Gemini.", 
-    responses={201: str}
+
+def _format_anamnesis(anamnese: Anamnese) -> str:
+    # Per RQ002: Name, Email, and Date of Birth are intentionally excluded
+    # before sending health data to the LLM.
+    lines = [
+        f"Estilo alimentar: {anamnese.get_eating_style_display()}",
+        f"Sentimento sobre o corpo e alimentação: {anamnese.get_body_feeling_display() or 'Não informado'}",
+        f"Consumo de álcool: {'Sim' if anamnese.alcohol_intake else 'Não'}",
+        f"Tabagismo: {'Sim' if anamnese.smoking else 'Não'}",
+        f"Alimentos favoritos: {anamnese.favorite_foods or 'Não informado'}",
+        f"Aversões alimentares: {anamnese.food_aversions or 'Nenhuma relatada'}",
+        f"Histórico de doenças: {anamnese.disease_history or 'Nenhum relatado'}",
+        f"Medicamentos em uso: {anamnese.medications or 'Nenhum'}",
+    ]
+    if anamnese.previous_consultation:
+        lines.append(
+            f"Consulta prévia com nutricionista — Objetivo: {anamnese.previous_consultation_objective}"
+        )
+        if anamnese.previous_consultation_result:
+            lines.append(f"Resultado da consulta: {anamnese.previous_consultation_result}")
+
+    return "\n".join(lines)
+
+
+def _format_food_data(food_data: dict | None) -> str:
+    if not food_data:
+        return "Nenhum produto específico fornecido. Análise baseada apenas na query do usuário."
+
+    product = food_data.get('product', {})
+    product_name = product.get('product_name', 'Nome não disponível')
+
+    ingredients = product.get('ingredients', [])
+    ingredient_list = ", ".join(
+        f"{ing['text']} ({ing.get('percent_estimate', 0):.1f}%)"
+        for ing in ingredients
+        if ing.get('text')
     )
+
+    allergens = ", ".join(product.get('allergens_tags', [])) or "Nenhum declarado"
+    additives = ", ".join(product.get('additives_tags', [])) or "Nenhum"
+
+    return "\n".join([
+        f"Produto: {product_name}",
+        f"Ingredientes: {ingredient_list or 'Não disponível'}",
+        f"Alérgenos declarados: {allergens}",
+        f"Aditivos: {additives}",
+    ])
+
+
+@extend_schema(
+    summary="Cria uma nova mensagem de chat",
+    description=(
+        "Recebe o texto do usuário e, opcionalmente, dados de produto via OpenFoodFacts. "
+        "Executa o pipeline DSPy de análise de segurança alimentar e retorna o veredito "
+        "nutricional estruturado."
+    ),
+    responses={
+        201: inline_serializer(
+            name="MessageCreateResponse",
+            fields={
+                "chat_id": serializers.UUIDField(),
+                "response": serializers.CharField(),
+                "verdict": serializers.ChoiceField(choices=["SAFE", "DANGEROUS"]),
+                "recommends_doctor": serializers.BooleanField(),
+            },
+        )
+    },
+)
 class MessageCreateAPIView(CreateAPIView):
     serializer_class = MessageSerializer
 
@@ -36,33 +100,50 @@ class MessageCreateAPIView(CreateAPIView):
         user_message_content = serializer.validated_data.get('content', '')
 
         if not chat_id:
-            chat = Chat.objects.create(user=self.request.user, title=user_message_content[:15])
+            chat = Chat.objects.create(user=request.user, title=user_message_content[:15])
         else:
             chat = get_object_or_404(Chat, id=chat_id)
 
         if not chat.is_active:
             raise ChatClosedException()
 
+        # food_data must be captured before serializer.save(), which pops it from validated_data
+        food_data = serializer.validated_data.get('food_data')
         user_message = serializer.save(chat=chat)
 
+        anamnese = Anamnese.objects.filter(user=request.user).first()
+        user_anamnesis = _format_anamnesis(anamnese) if anamnese else "Anamnese não disponível."
+        food_ingredients = _format_food_data(food_data)
+
         try:
-            ai_response_text = gemini_client.generate_response(user_message.content)
+            result = gemini_client.assess_safety(
+                user_anamnesis=user_anamnesis,
+                food_ingredients=food_ingredients,
+                user_query=user_message.content,
+            )
         except Exception as e:
-            logger.error(f"Erro de cliente na API: {e}")
-            return Response({"error": "Erro ao processar sua resposta"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error("Erro no pipeline de IA: %s", str(e), exc_info=True)
+            return Response(
+                {"error": "Erro ao processar sua resposta"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         ai_message = Message.objects.create(
             chat=chat,
             role=Message.Role.ASSISTANT,
-            content=ai_response_text
+            content=result["explanation"],
         )
 
-        response_data = {
-            "chat_id": chat.id,
-            "response": ai_message.content,
-        }
+        return Response(
+            {
+                "chat_id": chat.id,
+                "response": ai_message.content,
+                "verdict": result["verdict"],
+                "recommends_doctor": result["recommends_doctor"],
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
-        return Response(response_data, status=status.HTTP_201_CREATED)
 
 @extend_schema(summary="Lista mensagens de um chat específico do usuário")
 class MessageListAPIView(ListAPIView):
