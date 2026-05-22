@@ -1,39 +1,49 @@
 import logging
-from django.conf import settings
-from google import genai
-from google.genai import types
 
+import dspy
+from django.conf import settings
+
+from foodguard.core.services.ai_signatures import AssessFoodSafety, FoodSafetyAssessment
 
 logger = logging.getLogger('django')
 
+
 class GeminiClient:
-    def __init__(self, model_id=None, system_prompt=None, temperature=None):
-        self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        self.model_id = model_id or settings.GEMINI_MODEL_NAME
-        
-        self._system_instruction = system_prompt or self._load_system_prompt()
-
-        self.config = types.GenerateContentConfig(
-            system_instruction=self._system_instruction,
-            temperature=temperature or settings.GEMINI_TEMPERATURE,
+    def __init__(self):
+        lm = dspy.LM(
+            model="gemini/gemini-2.5-flash",
+            api_key=settings.GEMINI_API_KEY,
+            temperature=settings.GEMINI_TEMPERATURE,
         )
+        dspy.configure(lm=lm, adapter=dspy.JSONAdapter())
+        self._chain = dspy.ChainOfThought(AssessFoodSafety)
 
-    def generate_response(self, prompt):
+    def assess_safety(
+        self,
+        user_anamnesis: str,
+        food_ingredients: str,
+        user_query: str,
+    ) -> dict:
         try:
-            response = self.client.models.generate_content(
-                model=self.model_id,
-                contents=prompt,
-                config=self.config
+            result = self._chain(
+                user_anamnesis=user_anamnesis,
+                food_ingredients=food_ingredients,
+                user_query=user_query,
             )
-            return response.text
-        except Exception as e:
-            logger.error(f"Erro na conexão com Gemini: {str(e)}", exc_info=True)
-            raise e
 
-    def _load_system_prompt(self):
-        try:
-            with open(settings.SYSTEM_PROMPT_PATH, 'r', encoding='utf-8') as f:
-                return f.read()
+            assessment: FoodSafetyAssessment = result.assessment
+
+            logger.debug(
+                "DSPy ChainOfThought rationale: %s",
+                getattr(result, "rationale", "N/A"),
+            )
+
+            return {
+                "rationale": getattr(result, "rationale", ""),
+                "verdict": assessment.verdict,
+                "explanation": assessment.explanation,
+                "recommends_doctor": assessment.recommends_doctor,
+            }
         except Exception as e:
-            logger.error(f"Erro ao carregar arquivo de prompt: {e}")
-            return "Você é um assistente nutricional útil."
+            logger.error("Erro no pipeline DSPy: %s", str(e), exc_info=True)
+            raise

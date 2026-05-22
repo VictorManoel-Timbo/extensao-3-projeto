@@ -26,9 +26,9 @@ class AnamneseGetUpdateView(RetrieveUpdateAPIView):
         return get_object_or_404(Anamnese, user=self.request.user)
 
     def perform_update(self, serializer):
-        anamnese = self.get_object()
+        serializer.save()
         Chat.objects.filter(
-            user=self.request.user, 
-            created_at__lte=anamnese.updated_at
+            user=self.request.user,
+            created_at__lte=serializer.instance.updated_at,
         ).update(is_active=False)
 
