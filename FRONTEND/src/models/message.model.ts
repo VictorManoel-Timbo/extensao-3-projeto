@@ -1,5 +1,4 @@
 import { type MessageRole } from "@/enums/MessageRole";
-import type { IOpenFoodProduct } from "@/models/open-food.model";
 
 export interface Message {
   chat_id: string;
@@ -12,7 +11,6 @@ export interface MessageCreateRequest {
   role: MessageRole;
   content: string;
   chat_id?: string;
-  food_data?: IOpenFoodProduct;
 }
 
 export interface MessageCreateResponse {
