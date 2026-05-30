@@ -28,7 +28,7 @@ const Index = () => {
 
   return (
     <div className="flex px-[20vw] h-screen flex-col bg-slate-100 overflow-hidden">
-      <NavBar />
+      <NavBar variant="app" />
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 gap-8 px-6 py-8 overflow-hidden">
         <Sidebar

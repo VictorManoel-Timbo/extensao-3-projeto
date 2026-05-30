@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom"
 import { FiUser } from "react-icons/fi"
 import {
     DropdownMenu,
@@ -6,61 +7,81 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useState } from "react";
-import EditProfileModal from "../profile/EditProfileModal";
-import { useNavigate } from "react-router-dom";
 
-const NavBar = () => {
-    const [modalOpen, setModalOpen] = useState(false);
+type NavBarProps = {
+    variant?: "home" | "app"
+}
+
+const scrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })
+}
+
+const NavBar = ({ variant = "home" }: NavBarProps) => {
     const navigate = useNavigate();
 
     return (
-        <>
-            <header className="pt-6">
-                <div className="flex max-w-6xl items-center gap-4">
-                    <div className="flex flex-1 items-center justify-between rounded-full border border-zinc-500 bg-white pl-6 pr-8 py-3 shadow-sm shadow-black/15">
-                        <h1 className="font-sansita text-4xl font-extrabold tracking-tight text-black">
-                            FoodGuard
-                        </h1>
-                        <nav className="flex items-center gap-16">
-                            <a
-                                href="#como-funciona"
+        <header className={variant === "home" ? "fixed pt-6 left-1/2 z-50 w-[min(95%,1100px)] -translate-x-1/2" : "pt-6"}>
+            <div className="flex items-center gap-4">
+                <div className="flex flex-1 items-center justify-between rounded-full border border-zinc-500 bg-white pl-6 pr-8 py-3 shadow-sm shadow-black/15 backdrop-blur-md">
+                    <button
+                        onClick={() => variant === "home"
+                            ? window.scrollTo({ top: 0, behavior: "smooth" })
+                            : navigate("/")
+                        }
+                        className="font-sansita text-4xl font-extrabold tracking-tight text-black"
+                    >
+                        FoodGuard
+                    </button>
+
+                    <nav className="flex items-center gap-16">
+                        {variant === "home" ? (
+                            <>
+                                <button
+                                    onClick={() => scrollTo("como-funciona")}
+                                    className="text-base font-semibold text-black transition-colors hover:text-foodguard-500"
+                                >
+                                    Como funciona?
+                                </button>
+                                <button
+                                    onClick={() => scrollTo("quem-somos")}
+                                    className="text-base font-semibold text-black transition-colors hover:text-foodguard-500"
+                                >
+                                    Quem somos
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={() => navigate("/")}
                                 className="text-base font-semibold text-black transition-colors hover:text-foodguard-500"
                             >
-                                Como funciona?
-                            </a>
-                            <a
-                                href="#quem-somos"
-                                className="text-base font-semibold text-black transition-colors hover:text-foodguard-500"
-                            >
-                                Quem somos
-                            </a>
-                        </nav>
-                    </div>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <div className="flex items-center justify-center bg-red-500/20 rounded-full p-4 max-w-14 max-h-14 shadow-sm shadow-black/15 cursor-pointer"
-                                aria-label="Perfil de usuário">
-                                <FiUser className="text-4xl text-red-500 font-extrabold" />
-                            </div>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="bg-white border border-zinc-500 font-medium">
-                            <DropdownMenuGroup>
-                                <DropdownMenuItem onClick={() => { setModalOpen(true) }} className="outline-none hover:bg-foodguard-300/50 active:bg-foodguard-300">
-                                    Editar
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { navigate("/login") }} className="text-red-700 outline-none hover:bg-red-300 active:bg-red-400">
-                                    Sair
-                                </DropdownMenuItem>
-                            </DropdownMenuGroup>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                                Página inicial
+                            </button>
+                        )}
+                    </nav>
                 </div>
 
-            </header>
-
-            <EditProfileModal open={modalOpen} onClose={() => setModalOpen(false)} />
-        </>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <div
+                            className="flex items-center justify-center bg-red-500/20 rounded-full p-4 max-w-14 max-h-14 shadow-sm shadow-black/15 cursor-pointer"
+                            aria-label="Perfil de usuário"
+                        >
+                            <FiUser className="text-4xl text-red-500 font-extrabold" />
+                        </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="bg-white border border-zinc-500 font-medium">
+                        <DropdownMenuGroup>
+                            <DropdownMenuItem className="outline-none hover:bg-foodguard-300/50 active:bg-foodguard-300">
+                                Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-700 outline-none hover:bg-red-300 active:bg-red-400">
+                                Sair
+                            </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+        </header>
     );
 };
 
