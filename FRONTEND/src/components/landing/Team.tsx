@@ -11,7 +11,7 @@ const members = [
 
 export function Team() {
   return (
-    <section id="quem-somos" className="py-24">
+    <section id="quem-somos" className="min-h-screen py-24">
       <div className="mx-auto max-w-6xl px-6">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-foodguard-500">

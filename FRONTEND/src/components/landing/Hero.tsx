@@ -2,12 +2,17 @@ import heroImage from "@/assets/hero-food.jpg";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { isAuthenticated } from "@/router/router";
 
 export function Hero() {
   const navigate = useNavigate();
 
+  const handleInitChat = () => {
+    navigate(isAuthenticated() ? "/chat" : "/login")
+  }
+
   return (
-    <section className="relative isolate overflow-hidden pt-32 pb-20 md:pt-40 md:pb-32">
+    <section className="relative isolate overflow-hidden min-h-screen pt-32 pb-20 md:pt-40 md:pb-32">
       <div
         className="absolute inset-0 -z-10 bg-cover bg-center opacity-90"
         style={{ backgroundImage: `url(${heroImage})` }}
@@ -40,7 +45,7 @@ export function Hero() {
             <Button
               size="lg"
               className="rounded-full px-6 bg-foodguard-500 hover:bg-foodguard-600 text-white border-transparent"
-              onClick={() => navigate("/chat")}
+              onClick={handleInitChat}
             >
               Iniciar conversa
               <ArrowRight className="ml-1 h-4 w-4" />

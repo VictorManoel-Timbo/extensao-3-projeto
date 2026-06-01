@@ -28,21 +28,9 @@ const features = [
   },
 ];
 
-const stack = [
-  "React",
-  "TypeScript",
-  "Vite",
-  "TailwindCSS",
-  "shadcn/ui",
-  "Axios",
-  "YOLOv8n",
-  "ONNX Runtime-web",
-  "Firebase Auth",
-];
-
 export function HowItWorks() {
   return (
-    <section id="como-funciona" className="bg-slate-100 py-24">
+    <section id="como-funciona" className="min-h-screen bg-slate-100 py-24">
       <div className="mx-auto max-w-6xl px-6">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-wider text-foodguard-500">
@@ -78,18 +66,6 @@ export function HowItWorks() {
                 </p>
               </CardContent>
             </Card>
-          ))}
-        </div>
-
-        <div className="mt-10 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-          <span className="font-medium text-black">Stack:</span>
-          {stack.map((t) => (
-            <span
-              key={t}
-              className="rounded-full border border-zinc-300 bg-white px-3 py-1"
-            >
-              {t}
-            </span>
           ))}
         </div>
       </div>
