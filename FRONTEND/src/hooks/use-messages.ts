@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import type { Chat } from "@/models/chat.model";
 import { MessageRole } from "@/enums/MessageRole";
 import type { Message as BackendMessage } from "@/models/message.model";
@@ -64,10 +63,16 @@ export const useMessages = (
   };
 
   const handleSend = (text: string, image?: File, product?: IOpenFoodProduct) => {
-    const finalMessage =
-      !text.trim() && product
-        ? "Acabei de escanear um produto. O que você pode me dizer sobre ele?"
-        : text;
+    const productName = product?.product.product_name;
+
+    let finalMessage = text;
+    if (productName) {
+      if (!text.trim()) {
+        finalMessage = `Acabei de escanear o produto: ${productName}. O que você pode me dizer sobre ele?`;
+      } else {
+        finalMessage = `${text}\n\n[Produto escaneado: ${productName}]`;
+      }
+    }
 
     const userMsg: Message = {
       id: `u${Date.now()}`,
@@ -104,13 +109,12 @@ export const useMessages = (
         role: MessageRole.User,
         content: finalMessage,
         chat_id: currentChatId ?? undefined,
-        food_data: product,
       })
       .then((res) => {
         const resolvedChatId = res.chat_id;
 
         if (!currentChatId) {
-          const title = (finalMessage || "Nova conversa").slice(0, 28);
+          const title = (finalMessage || productName || "Nova conversa").slice(0, 28);
           addChat({
             id: resolvedChatId,
             title,
@@ -143,16 +147,14 @@ export const useMessages = (
           }));
         }
       })
-      .catch((err) => {
-        const detail =
-          axios.isAxiosError(err) && err.response?.data?.detail
-            ? err.response.data.detail
-            : "Erro ao processar sua mensagem. Tente novamente.";
+      .catch(() => {
         const chatKey = currentChatId ?? "__new__";
         setMessagesByChat((prev) => ({
           ...prev,
           [chatKey]: (prev[chatKey] ?? []).map((m) =>
-            m.id === pendingMsg.id ? { ...m, text: detail, pending: false } : m,
+            m.id === pendingMsg.id
+              ? { ...m, text: "Erro ao processar sua mensagem. Tente novamente.", pending: false }
+              : m,
           ),
         }));
       });

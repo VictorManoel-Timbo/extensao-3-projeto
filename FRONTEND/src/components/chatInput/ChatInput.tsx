@@ -24,8 +24,8 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
 
   const isBusy = disabled || isScanning || isProductLoading;
 
-  const handleSubmit = (e?: React.BaseSyntheticEvent | React.KeyboardEvent) => {
-    e?.preventDefault();
+  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
     if (isBusy || (!value.trim() && !image)) return;
 
     onSend(value, image || undefined, productData || undefined);
