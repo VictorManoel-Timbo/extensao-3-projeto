@@ -5,13 +5,35 @@ import type { Message as BackendMessage } from "@/models/message.model";
 import type { IOpenFoodProduct } from "@/models/open-food.model";
 import { messageService } from "@/services/message.service";
 
+export type AssistantStatus = "seguro" | "cuidado"
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
   text: string;
+  status?: AssistantStatus;
+  summary?: string;
+  details?: string;
   image?: File;
   imageUrl?: string;
   pending?: boolean;
+}
+
+function parseAssistantResponse(content: string): Partial<Message> {
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed.status && parsed.summary) {
+      return {
+        text: parsed.summary,
+        status: parsed.status as AssistantStatus,
+        summary: parsed.summary,
+        details: parsed.details ?? "",
+      };
+    }
+  } catch {
+    // não é JSON, retorna como texto simples
+  }
+  return { text: content };
 }
 
 function mapRole(role: MessageRole): "user" | "assistant" {
@@ -19,11 +41,19 @@ function mapRole(role: MessageRole): "user" | "assistant" {
 }
 
 function mapBackendMessages(messages: BackendMessage[]): Message[] {
-  return messages.map((m, i) => ({
-    id: `${m.created_at}-${i}`,
-    role: mapRole(m.role),
-    text: m.content,
-  }));
+  return messages.map((m, i) => {
+    const role = mapRole(m.role);
+    const base = {
+      id: `${m.created_at}-${i}`,
+      role,
+    };
+
+    if (role === "assistant") {
+      return { ...base, ...parseAssistantResponse(m.content) } as Message;
+    }
+
+    return { ...base, text: m.content } as Message;
+  });
 }
 
 export const useMessages = (
@@ -126,12 +156,12 @@ export const useMessages = (
 
           setMessagesByChat((prev) => {
             const tempMessages = prev["__new__"] ?? [];
-            const { __new__, ...rest } = prev;
+            const { __new__,...rest } = prev;
             return {
               ...rest,
               [resolvedChatId]: tempMessages.map((m) =>
                 m.id === pendingMsg.id
-                  ? { ...m, text: res.response, pending: false }
+                  ? { ...m, ...parseAssistantResponse(res.response), pending: false }
                   : m,
               ),
             };
