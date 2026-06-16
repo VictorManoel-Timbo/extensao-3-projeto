@@ -2,13 +2,14 @@ import heroImage from "@/assets/hero-food.jpg";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { isAuthenticated } from "@/router/router";
+import { useAuth } from "@/hooks/use-auth";
 
 export function Hero() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const handleInitChat = () => {
-    navigate(isAuthenticated() ? "/chat" : "/login")
+    navigate(isAuthenticated ? "/chat" : "/login")
   }
 
   return (

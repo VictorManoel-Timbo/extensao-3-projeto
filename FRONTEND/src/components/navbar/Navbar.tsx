@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { FiUser } from "react-icons/fi"
 import {
@@ -7,6 +8,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import EditProfileModal from "@/components/profile/EditProfileModal"
+import { useAuth } from "@/hooks/use-auth"
 
 type NavBarProps = {
     variant?: "home" | "app"
@@ -18,6 +21,13 @@ const scrollTo = (id: string) => {
 
 const NavBar = ({ variant = "home" }: NavBarProps) => {
     const navigate = useNavigate();
+    const { logout } = useAuth();
+    const [profileOpen, setProfileOpen] = useState(false);
+
+    const handleLogout = async () => {
+        await logout();
+        navigate("/", { replace: true });
+    };
 
     return (
         <header className={variant === "home" ? "fixed pt-6 left-1/2 z-50 w-[min(95%,1100px)] -translate-x-1/2" : "pt-6"}>
@@ -71,16 +81,24 @@ const NavBar = ({ variant = "home" }: NavBarProps) => {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="bg-white border border-zinc-500 font-medium">
                         <DropdownMenuGroup>
-                            <DropdownMenuItem className="outline-none hover:bg-foodguard-300/50 active:bg-foodguard-300">
+                            <DropdownMenuItem
+                                onSelect={() => setProfileOpen(true)}
+                                className="outline-none hover:bg-foodguard-300/50 active:bg-foodguard-300"
+                            >
                                 Editar
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-700 outline-none hover:bg-red-300 active:bg-red-400">
+                            <DropdownMenuItem
+                                onSelect={handleLogout}
+                                className="text-red-700 outline-none hover:bg-red-300 active:bg-red-400"
+                            >
                                 Sair
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
+
+            <EditProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
         </header>
     );
 };
