@@ -11,9 +11,15 @@ class User(AbstractUser):
 
     name = models.CharField(
         max_length=250,
-        blank=False,    
+        blank=False,
         null=False,
         validators=[validador_name],
+    )
+    email = models.EmailField(
+        unique=True,
+        blank=False,
+        null=False,
+        verbose_name="Email",
     )
     date_of_birth = models.DateField(
         null=True,

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { HelpCircle } from "lucide-react";
+import type { AnamneseRequest, BodyFeeling, EatingStyle } from "@/models/anamnese.model";
 
 const Radio = ({
     name,
@@ -33,32 +34,87 @@ const Radio = ({
     </label>
 );
 
+const FEELING_MAP: Record<string, BodyFeeling> = {
+    "muito-satisfeito": "very_satisfied",
+    satisfeito: "satisfied",
+    indiferente: "indifferent",
+    insatisfeito: "dissatisfied",
+    "muito-insatisfeito": "very_dissatisfied",
+};
+
+const textareaClass =
+    "w-full resize-none rounded-md border border-zinc-500 bg-slate-50 px-3 py-2 text-black focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30";
+
 interface Props {
-    onNext: () => void;
-    onBack: () => void;
+    onSubmit: (data: AnamneseRequest) => Promise<void>;
+    onBack?: () => void;
+    submitting?: boolean;
+    error?: string | null;
 }
 
-const AnamneseStep = ({ onNext, onBack }: Props) => {
-    const [consulta, setConsulta] = useState("sim");
+const AnamneseStep = ({ onSubmit, onBack, submitting = false, error }: Props) => {
+    const [consulta, setConsulta] = useState("nao");
+    const [objetivo, setObjetivo] = useState("");
+    const [resultado, setResultado] = useState("");
     const [intolerancia, setIntolerancia] = useState("");
     const [doencas, setDoencas] = useState("");
+    const [medicamentos, setMedicamentos] = useState("");
     const [alergia, setAlergia] = useState("");
     const [pref, setPref] = useState("");
     const [naoGosta, setNaoGosta] = useState("");
     const [sentimento, setSentimento] = useState("indiferente");
-    const [veg, setVeg] = useState("outro");
-    const [vegOutro, setVegOutro] = useState("");
+    const [veg, setVeg] = useState<EatingStyle>("not");
     const [alcool, setAlcool] = useState("nao");
     const [fumo, setFumo] = useState("nao");
+    const [localError, setLocalError] = useState<string | null>(null);
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setLocalError(null);
+
+        const isPrevious = consulta === "sim";
+        if (isPrevious && !objetivo.trim()) {
+            setLocalError("Informe o objetivo da consulta prévia com nutricionista.");
+            return;
+        }
+        if (!pref.trim()) {
+            setLocalError("Informe ao menos um alimento de preferência.");
+            return;
+        }
+
+        const payload: AnamneseRequest = {
+            previous_consultation: isPrevious,
+            previous_consultation_objective: isPrevious ? objetivo.trim() : null,
+            previous_consultation_result: isPrevious ? resultado.trim() || null : null,
+            disease_history: doencas.trim() || null,
+            medications: medicamentos.trim() || null,
+            food_allergies: alergia.trim() || null,
+            food_intolerances: intolerancia.trim() || null,
+            favorite_foods: pref.trim(),
+            food_aversions: naoGosta.trim() || null,
+            body_feeling: FEELING_MAP[sentimento] ?? null,
+            eating_style: veg,
+            alcohol_intake: alcool === "sim",
+            smoking: fumo === "sim",
+        };
+
+        await onSubmit(payload);
+    };
 
     return (
-        <>
+        <form onSubmit={handleSubmit}>
             <div className="flex items-center gap-3">
                 <h2 className="font-sansita text-2xl font-extrabold tracking-tight text-black sm:text-3xl">
                     FORMULÁRIO DE PERFIL ALIMENTAR
                 </h2>
                 <HelpCircle className="h-8 w-8 text-foodguard-600" />
             </div>
+
+            {(localError || error) && (
+                <div className="mt-4 rounded-md bg-red-100 px-4 py-2 text-sm font-medium text-red-700">
+                    {localError || error}
+                </div>
+            )}
 
             <div className="mt-8 grid gap-8 sm:grid-cols-2">
                 <div className="space-y-3">
@@ -71,64 +127,63 @@ const AnamneseStep = ({ onNext, onBack }: Props) => {
                     </div>
                 </div>
 
+                {consulta === "sim" ? (
+                    <>
+                        <div className="space-y-2">
+                            <label className="block font-semibold text-black">
+                                Qual era o objetivo na época?
+                            </label>
+                            <textarea value={objetivo} onChange={(e) => setObjetivo(e.target.value)} rows={4} className={textareaClass} />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="block font-semibold text-black">
+                                Obteve resultado? Se sim, qual?
+                            </label>
+                            <textarea value={resultado} onChange={(e) => setResultado(e.target.value)} rows={4} className={textareaClass} />
+                        </div>
+                    </>
+                ) : null}
+
                 <div className="space-y-2">
                     <label className="block font-semibold text-black">
                         Tem intolerância a algum alimento? Se sim, qual?
                     </label>
-                    <textarea
-                        value={intolerancia}
-                        onChange={(e) => setIntolerancia(e.target.value)}
-                        rows={4}
-                        className="w-full resize-none rounded-md border border-zinc-500 bg-slate-50 px-3 py-2 text-black focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30"
-                    />
-                </div>
-
-                <div className="space-y-2">
-                    <label className="block font-semibold text-black">
-                        Você possui histórico de doenças? Se sim, quais?
-                    </label>
-                    <textarea
-                        value={doencas}
-                        onChange={(e) => setDoencas(e.target.value)}
-                        rows={4}
-                        className="w-full resize-none rounded-md border border-zinc-500 bg-slate-50 px-3 py-2 text-black focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30"
-                    />
+                    <textarea value={intolerancia} onChange={(e) => setIntolerancia(e.target.value)} rows={4} className={textareaClass} />
                 </div>
 
                 <div className="space-y-2">
                     <label className="block font-semibold text-black">
                         Possui alergia a algum alimento? Se sim, qual?
                     </label>
-                    <textarea
-                        value={alergia}
-                        onChange={(e) => setAlergia(e.target.value)}
-                        rows={4}
-                        className="w-full resize-none rounded-md border border-zinc-500 bg-slate-50 px-3 py-2 text-black focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30"
-                    />
+                    <textarea value={alergia} onChange={(e) => setAlergia(e.target.value)} rows={4} className={textareaClass} />
+                </div>
+
+                <div className="space-y-2">
+                    <label className="block font-semibold text-black">
+                        Você possui histórico de doenças? Se sim, quais?
+                    </label>
+                    <textarea value={doencas} onChange={(e) => setDoencas(e.target.value)} rows={4} className={textareaClass} />
+                </div>
+
+                <div className="space-y-2">
+                    <label className="block font-semibold text-black">
+                        Faz uso de algum medicamento? Se sim, qual?
+                    </label>
+                    <textarea value={medicamentos} onChange={(e) => setMedicamentos(e.target.value)} rows={4} className={textareaClass} />
                 </div>
 
                 <div className="space-y-2">
                     <label className="block font-semibold text-black">
                         Alimentos que você tem preferência?
                     </label>
-                    <textarea
-                        value={pref}
-                        onChange={(e) => setPref(e.target.value)}
-                        rows={4}
-                        className="w-full resize-none rounded-md border border-zinc-500 bg-slate-50 px-3 py-2 focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30"
-                    />
+                    <textarea value={pref} onChange={(e) => setPref(e.target.value)} rows={4} className={textareaClass} />
                 </div>
 
                 <div className="space-y-2">
                     <label className="block font-semibold text-black">
                         Alimentos que você não gosta?
                     </label>
-                    <textarea
-                        value={naoGosta}
-                        onChange={(e) => setNaoGosta(e.target.value)}
-                        rows={4}
-                        className="w-full resize-none rounded-md border border-zinc-500 bg-slate-50 px-3 py-2 focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30"
-                    />
+                    <textarea value={naoGosta} onChange={(e) => setNaoGosta(e.target.value)} rows={4} className={textareaClass} />
                 </div>
 
                 <div className="space-y-3">
@@ -145,21 +200,12 @@ const AnamneseStep = ({ onNext, onBack }: Props) => {
                 </div>
 
                 <div className="space-y-3">
-                    <p className="font-semibold text-black">Vegetariano?</p>
+                    <p className="font-semibold text-black">Estilo de alimentação</p>
                     <div className="grid grid-cols-2 gap-2">
-                        <Radio name="veg" value="nao" checked={veg === "nao"} onChange={setVeg} label="Não" />
-                        <Radio name="veg" value="vegano" checked={veg === "vegano"} onChange={setVeg} label="Vegano(a)" />
-                        <Radio name="veg" value="vegetariano" checked={veg === "vegetariano"} onChange={setVeg} label="Vegetariano(a)" />
-                        <Radio name="veg" value="outro" checked={veg === "outro"} onChange={setVeg} label="Outro" />
+                        <Radio name="veg" value="not" checked={veg === "not"} onChange={(v) => setVeg(v as EatingStyle)} label="Não" />
+                        <Radio name="veg" value="vegan" checked={veg === "vegan"} onChange={(v) => setVeg(v as EatingStyle)} label="Vegano(a)" />
+                        <Radio name="veg" value="vegetarian" checked={veg === "vegetarian"} onChange={(v) => setVeg(v as EatingStyle)} label="Vegetariano(a)" />
                     </div>
-                    {veg === "outro" && (
-                        <input
-                            type="text"
-                            value={vegOutro}
-                            onChange={(e) => setVegOutro(e.target.value)}
-                            className="mt-2 h-10 w-full rounded-md border border-zinc-500 bg-slate-50 px-3 focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30"
-                        />
-                    )}
                 </div>
 
                 <div className="space-y-3">
@@ -180,20 +226,26 @@ const AnamneseStep = ({ onNext, onBack }: Props) => {
             </div>
 
             <div className="mt-10 flex items-center justify-between">
+                {onBack ? (
+                    <button
+                        type="button"
+                        onClick={onBack}
+                        className="h-12 rounded-lg border-2 border-foodguard-500 px-10 font-bold uppercase tracking-wide text-foodguard-600 transition-colors hover:bg-foodguard-600/10"
+                    >
+                        Voltar
+                    </button>
+                ) : (
+                    <span />
+                )}
                 <button
-                    onClick={onBack}
-                    className="h-12 rounded-lg border-2 border-foodguard-500 px-10 font-bold uppercase tracking-wide text-foodguard-600 transition-colors hover:bg-foodguard-600/10"
+                    type="submit"
+                    disabled={submitting}
+                    className="h-12 rounded-lg bg-foodguard-600 px-10 font-bold uppercase tracking-wide text-white transition-colors hover:bg-foodguard-600/90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    Voltar
-                </button>
-                <button
-                    onClick={onNext}
-                    className="h-12 rounded-lg bg-foodguard-600 px-10 font-bold uppercase tracking-wide text-white transition-colors hover:bg-foodguard-600/90"
-                >
-                    Continuar
+                    {submitting ? "Enviando..." : "Continuar"}
                 </button>
             </div>
-        </>
+        </form>
     );
 };
 

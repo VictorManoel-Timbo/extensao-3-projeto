@@ -49,6 +49,18 @@ class Anamnese(BaseModel):
         verbose_name="Faz uso de algum medicamento? Se sim, qual?"
     )
     
+    food_allergies = models.TextField(
+        blank=True, null=True,
+        max_length=5000,
+        verbose_name="Possui alergia a algum alimento? Se sim, qual?"
+    )
+
+    food_intolerances = models.TextField(
+        blank=True, null=True,
+        max_length=5000,
+        verbose_name="Tem intolerância a algum alimento? Se sim, qual?"
+    )
+
     favorite_foods = models.TextField(
         max_length=5000,
         verbose_name="Alimentos que você gosta de comer e não podem faltar"

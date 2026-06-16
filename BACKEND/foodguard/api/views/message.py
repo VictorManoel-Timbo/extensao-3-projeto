@@ -26,6 +26,8 @@ def _format_anamnesis(anamnese: Anamnese) -> str:
         f"Sentimento sobre o corpo e alimentação: {anamnese.get_body_feeling_display() or 'Não informado'}",
         f"Consumo de álcool: {'Sim' if anamnese.alcohol_intake else 'Não'}",
         f"Tabagismo: {'Sim' if anamnese.smoking else 'Não'}",
+        f"Alergias alimentares: {anamnese.food_allergies or 'Nenhuma relatada'}",
+        f"Intolerâncias alimentares: {anamnese.food_intolerances or 'Nenhuma relatada'}",
         f"Alimentos favoritos: {anamnese.favorite_foods or 'Não informado'}",
         f"Aversões alimentares: {anamnese.food_aversions or 'Nenhuma relatada'}",
         f"Histórico de doenças: {anamnese.disease_history or 'Nenhum relatado'}",

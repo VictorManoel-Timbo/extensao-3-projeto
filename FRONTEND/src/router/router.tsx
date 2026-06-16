@@ -1,47 +1,31 @@
-import {createBrowserRouter, Navigate, Outlet} from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 import Landing from "@/pages/Landing";
-import Index from "@/pages/Index";
 import Login from "@/pages/Login";
 import Cadastro from "@/pages/Cadastro";
 import EsqueciSenha from "@/pages/EsqueciSenha";
-
-export const isAuthenticated = () => sessionStorage.getItem("fg_auth") === "true"
-
-const ProtectedRoute = () => isAuthenticated() ? <Index/> : <Landing/>
-
-const GuestOnlyRout = () => isAuthenticated() ? <Navigate to="/chat" replace/> : <Outlet/>
+import AnamneseGate from "@/pages/AnamneseGate";
+import { ChatRoute, GuestOnlyRoute, ProtectedRoute } from "@/router/guards";
 
 const router = createBrowserRouter([
-    {
-        path: "/",
-        element: <Landing/>
-    },
-    {
-        element: <GuestOnlyRout/>,
-        children: [
-            {
-                path: "/login",
-                element: <Login/>
-            },
-            {
-                path: "/cadastro",
-                element: <Cadastro/>
-            },
-            {
-                path: "/esqueci-senha",
-                element: <EsqueciSenha/>
-            }
-        ]
-    },
-    {
-        element: <ProtectedRoute/>,
-        children: [
-            {
-                path: "/chat",
-                element: <Index/>
-            }
-        ]
-    }
-])
+  {
+    path: "/",
+    element: <Landing />,
+  },
+  {
+    element: <GuestOnlyRoute />,
+    children: [
+      { path: "/login", element: <Login /> },
+      { path: "/cadastro", element: <Cadastro /> },
+      { path: "/esqueci-senha", element: <EsqueciSenha /> },
+    ],
+  },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      { path: "/anamnese", element: <AnamneseGate /> },
+      { path: "/chat", element: <ChatRoute /> },
+    ],
+  },
+]);
 
-export default router
+export default router;

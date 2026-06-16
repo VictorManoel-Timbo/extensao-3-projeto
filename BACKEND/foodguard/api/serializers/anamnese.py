@@ -8,8 +8,8 @@ class AnamneseSerializer(ModelSerializer):
     class Meta:
         model = Anamnese
         fields = ['previous_consultation', 'alcohol_intake', 'smoking', 'previous_consultation_objective',
-                  'previous_consultation_result', 'disease_history', 'medications', 'favorite_foods', 'food_aversions',
-                  'body_feeling', 'eating_style']
+                  'previous_consultation_result', 'disease_history', 'medications', 'food_allergies',
+                  'food_intolerances', 'favorite_foods', 'food_aversions', 'body_feeling', 'eating_style']
 
     def validate(self, attrs):
         is_previous = attrs.get(

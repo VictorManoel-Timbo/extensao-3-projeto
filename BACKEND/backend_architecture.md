@@ -10,7 +10,7 @@ Reference document for understanding the backend structure before any code modif
 - **Database:** PostgreSQL 16
 - **AI:** Google Gemini API (`gemini-2.5-flash`, temperature 0.7)
 - **Server:** Uvicorn (ASGI)
-- **Auth:** Token-based via django-allauth + JWT (pyjwt)
+- **Auth:** JWT (access + refresh) via `djangorestframework-simplejwt`; login por email (`users.backends.EmailBackend`)
 - **Containerization:** Docker + VS Code Dev Containers
 - **Python:** 3.12.9
 
@@ -72,12 +72,14 @@ BACKEND/
 ### User (`users/models.py`) — extends `AbstractUser`
 
 - `name`: validated (letters, spaces, apostrophes, hyphens only)
+- `email`: unique, required (login identifier)
 - `date_of_birth`: optional date
 - Password: min 8 chars, uppercase + lowercase + digit required
 
 ### Anamnese (`core/models/anamnese.py`) — 1-to-1 with User
 
 - Clinical: `previous_consultation`, `previous_consultation_objective`, `previous_consultation_result`, `disease_history`, `medications`
+- Allergen profile: `food_allergies`, `food_intolerances`
 - Diet: `favorite_foods`, `food_aversions`, `eating_style` (choices: Not/Vegetarian/Vegan)
 - Health: `alcohol_intake`, `smoking`, `body_feeling` (choices)
 
@@ -112,6 +114,17 @@ Chat (1) ──── (N) Message
 /api/schema/      → OpenAPI schema
 /api/docs/        → Swagger UI (debug only)
 ```
+
+### Auth / Users (`/api/auth/`)
+
+| Method | Endpoint          | View                       | Behavior                                              |
+| ------ | ----------------- | -------------------------- | ----------------------------------------------------- |
+| POST   | `/register/`      | RegisterView               | Cadastro (name, username, email, dob, senha) — RF001  |
+| POST   | `/login/`         | EmailTokenObtainPairView   | Login por email → access/refresh + `has_anamnese`     |
+| POST   | `/token/refresh/` | TokenRefreshView           | Renova o access token                                 |
+| POST   | `/logout/`        | LogoutView                 | Blacklist do refresh token (RF017)                    |
+| GET    | `/me/`            | MeView                     | Perfil do usuário autenticado (+ `has_anamnese`)      |
+| PATCH  | `/me/`            | MeView                     | Edita username/senha (RN010)                          |
 
 ### Anamnese (`/api/anamnese/`)
 
@@ -192,7 +205,9 @@ Nutrition assistant specialized in food safety:
 - Pagination: LimitOffset, page_size=20
 - Timezone: `America/Fortaleza`
 - `ATOMIC_REQUESTS = True`
-- REST auth: `TokenAuthentication` + Allauth
+- REST auth: `JWTAuthentication` (simplejwt) + `SessionAuthentication` (admin/swagger)
+- `AUTHENTICATION_BACKENDS`: `users.backends.EmailBackend` → `ModelBackend`
+- `SIMPLE_JWT`: access 1h, refresh 24h, rotate + blacklist
 
 ---
 

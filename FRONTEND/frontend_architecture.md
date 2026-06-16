@@ -135,23 +135,40 @@ Component (ChatInput.tsx)
 ```env
 VITE_OPENFOOD_URL=https://world.openfoodfacts.org/api/v0/product/
 VITE_BASE_URL=http://localhost:8000
-VITE_API_USERNAME=<django username>
-VITE_API_PASSWORD=<django password>
 ```
 
 Vite proxy rewrites:
 - `/api/*` → `VITE_BASE_URL` (Django backend)
 - `/openfood/*` → `VITE_OPENFOOD_URL` (Open Food Facts)
 
-Backend authentication uses **HTTP Basic Auth** configured in `axiosConfig.ts`.
+Backend authentication uses **JWT (access + refresh)** via `djangorestframework-simplejwt`.
+Tokens are stored in `localStorage` (`config/tokenStorage.ts`) and injected as
+`Authorization: Bearer <access>` by the request interceptor in `axiosConfig.ts`.
+On a `401`, the response interceptor transparently refreshes the access token once
+(`/auth/token/refresh/`) and retries; if refresh fails, storage is cleared and the
+user is sent to `/login`.
+
+### Auth layer
+
+| File | Role |
+|---|---|
+| `config/tokenStorage.ts` | localStorage helpers for access/refresh/user |
+| `context/AuthContext.tsx` | global session state (`user`, `isAuthenticated`, `hasAnamnese`, `login`, `register`, `logout`, `markAnamneseDone`) |
+| `hooks/use-auth.ts` | `useAuth()` consumer of `AuthContext` |
+| `services/auth.service.ts` + `rest/auth.rest.ts` | register / login / logout / me |
+| `services/anamnese.service.ts` + `rest/anamnese.rest.ts` | create / get / update anamnese |
+| `models/auth.model.ts`, `models/anamnese.model.ts` | typed payloads mirroring the backend |
 
 ---
 
 ## Routing
 
-- Defined in `App.tsx` using `BrowserRouter` + `<Routes>`.
-- Currently only one route: `GET /` → `<Index />`.
-- `src/router/router.tsx` is empty — add new routes in `App.tsx`.
+- Defined in `src/router/router.tsx` using `createBrowserRouter`; `App.tsx` wraps it in `<AuthProvider>` + `RouterProvider`.
+- Route guards live in `src/router/guards.tsx` (kept separate so `router.tsx` only exports the route object — Fast Refresh rule):
+  - `GuestOnlyRoute` — `/login`, `/cadastro`, `/esqueci-senha`; redirects authenticated users to `/chat` (RN007).
+  - `ProtectedRoute` — requires an active session; otherwise redirects to `/login` (RN007).
+  - `ChatRoute` — anamnese gate (RN001): `/chat` requires a completed anamnese, else redirects to `/anamnese`.
+- Routes: `/` (Landing), `/login`, `/cadastro`, `/esqueci-senha`, `/anamnese` (`AnamneseGate`), `/chat` (`Index`).
 
 ---
 
