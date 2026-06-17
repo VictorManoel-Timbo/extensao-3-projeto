@@ -11,8 +11,8 @@ class MessageSerializer(ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ['chat_id', 'role', 'content', 'created_at', 'food_data']
-        read_only_fields = ['created_at']
+        fields = ['chat_id', 'role', 'content', 'created_at', 'food_data', 'verdict']
+        read_only_fields = ['created_at', 'verdict']
 
     def create(self, validated_data):
         validated_data.pop('food_data', None)

@@ -4,13 +4,70 @@ import dspy
 from pydantic import BaseModel, Field
 
 
+class ExtractUserContext(dspy.Signature):
+    """
+    Você extrai, da mensagem do usuário, informações pessoais DURÁVEIS e
+    relevantes para segurança alimentar que ele revele sobre si mesmo e que
+    AINDA NÃO constem na anamnese nem no contexto já registrado.
+
+    Extraia apenas fatos estáveis e úteis para futuras análises, como:
+    alergias, intolerâncias, doenças/condições de saúde, medicamentos de uso
+    contínuo, restrições/preferências alimentares persistentes.
+
+    NÃO extraia: perguntas, dúvidas, sintomas pontuais do momento, opiniões
+    passageiras, ou qualquer coisa já presente na anamnese/contexto.
+
+    Regras:
+    - Cada fato deve ser uma frase curta, objetiva, em português (ex.:
+      "Tem alergia a leite", "É diabético").
+    - Se a mensagem não trouxer nenhuma informação nova e durável, retorne uma
+      lista vazia.
+    - Não duplique informação já existente na anamnese ou no contexto.
+    - Não invente: extraia apenas o que o usuário afirmou explicitamente.
+    """
+
+    user_message: str = dspy.InputField(desc="Mensagem enviada pelo usuário.")
+    existing_anamnesis: str = dspy.InputField(
+        desc="Anamnese já cadastrada do usuário (não repetir o que já está aqui)."
+    )
+    existing_context: str = dspy.InputField(
+        desc="Fatos já registrados no contexto do usuário (não repetir)."
+    )
+    new_facts: list[str] = dspy.OutputField(
+        desc=(
+            "Lista de fatos novos e duráveis extraídos da mensagem que não estão "
+            "na anamnese nem no contexto. Lista vazia se não houver nenhum."
+        )
+    )
+
+
 class FoodSafetyAssessment(BaseModel):
-    verdict: Literal["SAFE", "DANGEROUS"] = Field(
+    verdict: Literal[
+        "SAFE", "LOW_CONCERN", "MODERATE_RISK", "HIGH_RISK", "INSUFFICIENT_DATA"
+    ] = Field(
         description=(
-            "Veredito final sobre a segurança do alimento para este usuário específico. "
-            "Use SAFE apenas quando houver certeza razoável de que o produto não representa "
-            "risco direto. Use DANGEROUS diante de qualquer risco confirmado ou incerteza "
-            "científica relevante."
+            "Classificação de segurança do produto para ESTE usuário, baseada "
+            "estritamente nos dados disponíveis (ingredientes, alérgenos, tabela "
+            "nutricional) cruzados com a anamnese. Escolha exatamente um nível:\n"
+            "- SAFE: nenhum risco nem alerta relevante para o perfil do usuário.\n"
+            "- LOW_CONCERN: não há risco direto ao perfil, mas existem pontos de "
+            "atenção nutricional geral (ex.: alto teor de açúcar, gordura saturada "
+            "ou sódio) OU divergência com o estilo alimentar declarado (ex.: contém "
+            "ingrediente de origem animal para usuário vegano/vegetariano). Use este "
+            "nível quando o usuário NÃO declarou doença que torne esses fatores "
+            "perigosos — é um alerta de moderação, não de risco.\n"
+            "- MODERATE_RISK: há um fator que exige cautela para o perfil — ex.: "
+            "nutriente elevado relevante a uma condição limítrofe, possível traço de "
+            "um alimento a que o usuário tem intolerância, ou incerteza científica "
+            "relevante sobre um ingrediente.\n"
+            "- HIGH_RISK: risco direto e confirmado — um alérgeno declarado pelo "
+            "usuário está presente no produto, OU há teor elevado de açúcar/gordura/"
+            "sódio COMBINADO a uma doença declarada na anamnese (ex.: diabetes, "
+            "hipertensão, dislipidemia).\n"
+            "- INSUFFICIENT_DATA: não há ingredientes nem dados nutricionais "
+            "suficientes para uma avaliação confiável.\n"
+            "Não exagere nem minimize: classifique pelo que os dados realmente "
+            "mostram, sem viés."
         )
     )
     explanation: str = Field(
@@ -19,17 +76,21 @@ class FoodSafetyAssessment(BaseModel):
             "independentemente do idioma da mensagem do usuário. Cruze os ingredientes do "
             "produto com o perfil de saúde do usuário. Identifique ingredientes de risco "
             "pelo nome e explique o mecanismo de perigo (ex: 'Contém caseína, proteína do "
-            "leite que desencadeia sua alergia'). Encerre com: 'Este é um auxílio "
-            "informativo baseado no seu perfil. Em caso de sintomas ou reações, procure "
-            "imediatamente um médico ou nutricionista.'"
+            "leite que desencadeia sua alergia'). NÃO inclua no texto o código do veredito "
+            "(SAFE, LOW_CONCERN, MODERATE_RISK, HIGH_RISK, INSUFFICIENT_DATA) — ele é "
+            "retornado à parte no campo `verdict`. Escreva em linguagem natural (ex.: 'há "
+            "pontos de atenção', 'risco elevado'), sem citar o código. Encerre com: 'Este "
+            "é um auxílio informativo baseado no seu perfil. Em caso de sintomas ou "
+            "reações, procure imediatamente um médico ou nutricionista.'"
         )
     )
     recommends_doctor: bool = Field(
         description=(
             "Deve ser True se: (1) o usuário relatou qualquer sintoma físico na consulta, "
             "ou (2) há incerteza científica sobre algum ingrediente em relação ao perfil do "
-            "usuário, ou (3) o veredito é DANGEROUS. False somente quando o produto for "
-            "comprovadamente seguro e o usuário não reportar sintoma algum."
+            "usuário, ou (3) o veredito é HIGH_RISK. Para MODERATE_RISK use seu julgamento "
+            "(True quando houver doença ou alergia/intolerância envolvida). False para "
+            "SAFE, LOW_CONCERN e INSUFFICIENT_DATA quando o usuário não reportar sintoma."
         )
     )
 
@@ -64,11 +125,33 @@ class AssessFoodSafety(dspy.Signature):
 
     4. **Postura Conservadora sobre Alergias (Anti-Alucinação):** Você não
        deve inventar, presumir ou extrapolar informações sobre alergias cruzadas
-       sem respaldo científico consolidado. Diante de QUALQUER dúvida ou
-       incerteza sobre a segurança de um ingrediente em relação ao perfil do
-       usuário, adote postura conservadora: classifique o alimento como
-       DANGEROUS e defina `recommends_doctor` como `true`. É preferível um
-       falso positivo a omitir um risco real.
+       sem respaldo científico consolidado. Diante de incerteza relevante sobre
+       a segurança de um ingrediente em relação ao perfil do usuário, classifique
+       no mínimo como MODERATE_RISK; se houver um alérgeno declarado pelo usuário
+       de fato presente, use HIGH_RISK. É preferível um falso positivo a omitir
+       um risco real, mas sem inflar a severidade sem dados.
+
+    ## Critérios de Veredito (use exatamente um nível)
+
+    - **Cruzamento obrigatório:** a severidade depende SEMPRE do cruzamento entre
+      os dados do produto e a anamnese. O mesmo produto pode ser SAFE para um
+      usuário e HIGH_RISK para outro.
+    - **Alto açúcar / gordura / sódio:** por si só NÃO é perigoso. Classifique
+      como LOW_CONCERN (alerta de moderação) quando o usuário não tem doença
+      relacionada. Só eleve para HIGH_RISK quando houver doença declarada na
+      anamnese diretamente impactada (ex.: açúcar elevado + diabetes; sódio
+      elevado + hipertensão; gordura saturada + dislipidemia/doença cardíaca).
+    - **Estilo alimentar:** se o produto contém ingrediente incompatível com o
+      estilo declarado (ex.: item de origem animal para vegano/vegetariano),
+      sinalize no mínimo LOW_CONCERN, explicando a divergência — isso é um
+      conflito de escolha alimentar, não necessariamente um risco à saúde.
+    - **Alérgenos / intolerâncias:** alérgeno declarado presente no produto =
+      HIGH_RISK. Possível traço ou intolerância com evidência fraca = MODERATE_RISK.
+    - **Sem dados suficientes:** se não há lista de ingredientes nem dados
+      nutricionais úteis, use INSUFFICIENT_DATA — não invente uma avaliação.
+    - **Imparcialidade:** decida o nível pelos dados reais. Não use um nível mais
+      severo "por precaução" quando os dados não o justificam, nem subestime
+      riscos confirmados.
 
     ## Protocolo de Análise
 

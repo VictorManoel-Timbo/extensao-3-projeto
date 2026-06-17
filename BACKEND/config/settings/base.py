@@ -240,6 +240,9 @@ OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 OPENAI_MODEL_NAME = env("OPENAI_MODEL_NAME", default="gpt-4o-mini")
 OPENAI_TEMPERATURE = env.float("OPENAI_TEMPERATURE", default=0.7)
 
+# Modelo auxiliar (leve) para extrair contexto do usuário em paralelo.
+CONTEXT_MODEL_NAME = env("CONTEXT_MODEL_NAME", default="gpt-4o-mini")
+
 # LOGGER CONFIGURATION
 LOGGING = {
     'version': 1,

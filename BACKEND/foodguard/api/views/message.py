@@ -1,8 +1,10 @@
 import logging
+import re
+import threading
 
 import dspy
 from django.conf import settings
-from django.db import transaction
+from django.db import connections, transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
@@ -18,6 +20,8 @@ from foodguard.api.serializers.message import MessageSerializer
 from foodguard.core.models.anamnese import Anamnese
 from foodguard.core.models.chat import Chat
 from foodguard.core.models.message import Message
+from foodguard.core.models.user_context import UserContext
+from foodguard.core.services.context_extractor import ContextExtractorClient
 from foodguard.core.services.gemini_client import GeminiClient
 from foodguard.core.services.openai_client import OpenAIClient
 
@@ -45,6 +49,94 @@ def get_ai_client():
     if _ai_client is None:
         _ai_client = _build_ai_client()
     return _ai_client
+
+
+_context_extractor = None
+
+
+def get_context_extractor():
+    """Lazy singleton do extrator de contexto. Retorna None se não houver
+    OPENAI_API_KEY configurada (o recurso fica desligado, sem quebrar o chat)."""
+    global _context_extractor
+    if not settings.OPENAI_API_KEY:
+        return None
+    if _context_extractor is None:
+        _context_extractor = ContextExtractorClient()
+    return _context_extractor
+
+
+def _get_user_context_text(user) -> str:
+    ctx = UserContext.objects.filter(user=user).only("content").first()
+    return ctx.content.strip() if ctx and ctx.content else ""
+
+
+def _extract_and_store_context(user_id, user_message, anamnesis_text, existing_context_text):
+    """Roda em thread separada (paralela ao modelo principal): extrai fatos
+    duráveis da mensagem e os persiste no contexto do usuário.
+
+    Concorrência: usa transação + select_for_update para serializar leituras/
+    escritas concorrentes do mesmo UserContext (evita lost update). Usa conexão
+    de banco própria da thread, fechada no finally.
+    """
+    try:
+        extractor = get_context_extractor()
+        if extractor is None:
+            return
+
+        facts = extractor.extract(user_message, anamnesis_text, existing_context_text)
+        if not facts:
+            return
+
+        # Garante a existência da linha antes do lock (get_or_create trata a
+        # corrida de criação da OneToOne via IntegrityError internamente).
+        UserContext.objects.get_or_create(user_id=user_id)
+
+        with transaction.atomic():
+            ctx = UserContext.objects.select_for_update().get(user_id=user_id)
+            existing_lines = [ln.strip() for ln in ctx.content.splitlines() if ln.strip()]
+            seen = {ln.lower() for ln in existing_lines}
+
+            added = []
+            for fact in facts:
+                key = fact.lower()
+                if key not in seen:
+                    seen.add(key)
+                    added.append(fact)
+
+            if added:
+                ctx.content = "\n".join(existing_lines + added)
+                ctx.save(update_fields=["content", "updated_at"])
+                logger.info("Contexto do usuário %s atualizado: +%d fato(s).", user_id, len(added))
+    except Exception as e:
+        logger.error("Erro ao extrair/salvar contexto do usuário: %s", str(e), exc_info=True)
+    finally:
+        # Fecha a conexão de banco aberta nesta thread.
+        connections.close_all()
+
+
+_VERDICT_CODES_RE = re.compile(
+    r"\b(?:SAFE|LOW_CONCERN|MODERATE_RISK|HIGH_RISK|INSUFFICIENT_DATA)\b"
+)
+
+
+def _strip_verdict_codes(text: str) -> str:
+    """Remove qualquer código de veredito que o modelo tenha vazado no texto —
+    o veredito vai à parte no campo `verdict`, não na resposta ao usuário."""
+    if not text:
+        return text
+    cleaned = _VERDICT_CODES_RE.sub("", text)
+    cleaned = re.sub(r"\(\s*\)|\[\s*\]", "", cleaned)  # parênteses/colchetes vazios
+    # Remove rótulos órfãos deixados pela remoção do código (ex.: "Veredito: .")
+    cleaned = re.sub(
+        r"(?i)\b(veredito|classifica[çc][ãa]o|classificado como)\s*[:\-]?\s*(?=[.,;]|$)",
+        "",
+        cleaned,
+    )
+    cleaned = re.sub(r"\s+([,.;:!?])", r"\1", cleaned)  # espaço antes de pontuação
+    cleaned = re.sub(r"([,;:]\s*){2,}", lambda m: m.group(0)[-2:], cleaned)  # pontuação repetida
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"^[\s,.;:]+", "", cleaned)  # pontuação/espaço no início
+    return cleaned.strip()
 
 
 def _format_anamnesis(anamnese: Anamnese) -> str:
@@ -127,6 +219,16 @@ def _format_food_data(food_data: dict | None) -> str:
     return "\n".join(lines)
 
 
+def _chat_title(food_data: dict | None, fallback: str) -> str:
+    """Título do chat: nome do produto escaneado quando disponível, senão o
+    início da mensagem do usuário."""
+    if food_data:
+        name = (food_data.get('product', {}).get('product_name') or "").strip()
+        if name:
+            return name[:255]
+    return fallback[:15]
+
+
 def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
     """Monta o histórico DSPy pareando mensagens U -> A em ordem cronológica.
 
@@ -172,7 +274,11 @@ def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
                 "chat_id": serializers.UUIDField(),
                 "response": serializers.CharField(),
                 "verdict": serializers.ChoiceField(
-                    choices=["SAFE", "DANGEROUS"], allow_null=True
+                    choices=[
+                        "SAFE", "LOW_CONCERN", "MODERATE_RISK",
+                        "HIGH_RISK", "INSUFFICIENT_DATA",
+                    ],
+                    allow_null=True,
                 ),
                 "recommends_doctor": serializers.BooleanField(),
             },
@@ -201,7 +307,8 @@ class MessageCreateAPIView(CreateAPIView):
             with transaction.atomic():
                 if not chat_id:
                     chat = Chat.objects.create(
-                        user=request.user, title=user_message_content[:15]
+                        user=request.user,
+                        title=_chat_title(food_data, user_message_content),
                     )
                 else:
                     chat = get_object_or_404(Chat, id=chat_id, user=request.user)
@@ -220,9 +327,17 @@ class MessageCreateAPIView(CreateAPIView):
                 user_message = serializer.save(chat=chat)
 
                 anamnese = Anamnese.objects.filter(user=request.user).first()
-                user_anamnesis = (
+                anamnesis_text = (
                     _format_anamnesis(anamnese) if anamnese else "Anamnese não disponível."
                 )
+                # Contexto acumulado de conversas anteriores (fatos fora da anamnese).
+                existing_context_text = _get_user_context_text(request.user)
+                user_anamnesis = anamnesis_text
+                if existing_context_text:
+                    user_anamnesis += (
+                        "\n\nInformações adicionais que o usuário mencionou em "
+                        "conversas anteriores:\n" + existing_context_text
+                    )
 
                 if is_follow_up:
                     result = ai_client.continue_conversation(
@@ -242,10 +357,13 @@ class MessageCreateAPIView(CreateAPIView):
                     ai_content = result["explanation"]
                     verdict = result["verdict"]
 
+                ai_content = _strip_verdict_codes(ai_content)
+
                 ai_message = Message.objects.create(
                     chat=chat,
                     role=Message.Role.ASSISTANT,
                     content=ai_content,
+                    verdict=verdict,
                 )
         except (Http404, APIException):
             raise
@@ -255,6 +373,20 @@ class MessageCreateAPIView(CreateAPIView):
                 {"error": "Erro ao processar sua resposta"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        # Extração de contexto do usuário em paralelo (fire-and-forget): não
+        # bloqueia a resposta. Usa valores já capturados (strings/ids), sem
+        # compartilhar objetos do ORM nem a transação entre threads.
+        threading.Thread(
+            target=_extract_and_store_context,
+            args=(
+                request.user.id,
+                user_message_content,
+                anamnesis_text,
+                existing_context_text,
+            ),
+            daemon=True,
+        ).start()
 
         return Response(
             {

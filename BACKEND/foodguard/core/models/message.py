@@ -10,7 +10,14 @@ class Message(BaseModel):
     class Role(models.TextChoices):
         USER = 'U', _('Usuário')
         ASSISTANT = 'A', _('Assistente')
-    
+
+    class Verdict(models.TextChoices):
+        SAFE = 'SAFE', _('Seguro')
+        LOW_CONCERN = 'LOW_CONCERN', _('Atenção leve')
+        MODERATE_RISK = 'MODERATE_RISK', _('Risco moderado')
+        HIGH_RISK = 'HIGH_RISK', _('Alto risco')
+        INSUFFICIENT_DATA = 'INSUFFICIENT_DATA', _('Dados insuficientes')
+
     chat = models.ForeignKey(
         Chat,
         on_delete=models.CASCADE,
@@ -22,6 +29,15 @@ class Message(BaseModel):
     )
     content = models.TextField(
         max_length=5000
+    )
+    # Veredito da avaliação de segurança (apenas em mensagens do assistente
+    # geradas pelo pipeline de análise; null em mensagens de usuário e em
+    # respostas conversacionais de acompanhamento).
+    verdict = models.CharField(
+        max_length=20,
+        choices=Verdict.choices,
+        blank=True,
+        null=True,
     )
 
     class Meta:
