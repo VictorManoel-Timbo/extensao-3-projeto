@@ -2,9 +2,11 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const members = [
-  { name: "Aristóteles Feitosa", role: "Desenvolvedor", initials: "AF" },
-  { name: "Pedro Otávio de Sousa Bezerra", role: "Desenvolvedor", initials: "PB" },
-  { name: "Victor Manoel Magalhães Timbó", role: "Desenvolvedor", initials: "VT" },
+  { name: "Aristóteles Feitosa", role: "Desenvolvedor Backend", initials: "AF" },
+  { name: "Pedro Otávio de Sousa Bezerra", role: "Desenvolvedor Frontend", initials: "PB" },
+  { name: "Victor Manoel Magalhães Timbó", role: "Desenvolvedor Frontend", initials: "VT" },
+  { name: "Gabriel Pinheiro", role: "Requisitos e Qualidade", initials: "GP" },
+  { name: "Paulo Matheus", role: "Requisitos e Qualidade", initials: "PM" },
 ];
 
 export function Team() {
