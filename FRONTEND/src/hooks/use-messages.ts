@@ -140,6 +140,7 @@ export const useMessages = (
         role: MessageRole.User,
         content: finalMessage,
         chat_id: currentChatId ?? undefined,
+        food_data: product ?? undefined,
       })
       .then((res) => {
         const resolvedChatId = res.chat_id;

@@ -14,6 +14,8 @@ const AUTH_PUBLIC_PATHS = ["/auth/login/", "/auth/register/", REFRESH_URL];
 // Timeout do request de refresh para não bloquear refreshPromise indefinidamente
 const REFRESH_TIMEOUT_MS = 10_000;
 
+const APP_API_BASE_URL = "/api";
+
 function apiConfig(baseUrl: string): AxiosRequestConfig {
   return {
     baseURL: baseUrl,
@@ -58,7 +60,14 @@ function handleAuthFailure(): void {
 
 function initAxios(config: AxiosRequestConfig): AxiosInstance {
   const instance = axios.create(config);
-  const baseURL = (config.baseURL as string) ?? "/api";
+  const baseURL = (config.baseURL as string) ?? APP_API_BASE_URL;
+
+  // Instâncias de APIs externas (ex.: OpenFoodFacts) não recebem o JWT do
+  // FoodGuard nem o fluxo de refresh/logout — enviar o Authorization para o
+  // OpenFoodFacts resultava em 403.
+  if (baseURL !== APP_API_BASE_URL) {
+    return instance;
+  }
 
   instance.interceptors.request.use(
     (request) => {
