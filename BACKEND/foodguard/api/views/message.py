@@ -48,8 +48,6 @@ def get_ai_client():
 
 
 def _format_anamnesis(anamnese: Anamnese) -> str:
-    # Per RQ002: Name, Email, and Date of Birth are intentionally excluded
-    # before sending health data to the LLM.
     lines = [
         f"Estilo alimentar: {anamnese.get_eating_style_display()}",
         f"Sentimento sobre o corpo e alimentação: {anamnese.get_body_feeling_display() or 'Não informado'}",
@@ -113,9 +111,6 @@ def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
     for message in messages:
         if message.role == Message.Role.USER:
             if pending_user is not None:
-                # Duas mensagens de usuário consecutivas (resposta da IA ausente,
-                # ex.: falha anterior). Preservamos o turno com resposta vazia em
-                # vez de descartá-lo silenciosamente.
                 logger.warning(
                     "Mensagem de usuário sem resposta da IA no chat %s; "
                     "incluindo turno com answer vazia.", chat.id,
@@ -170,9 +165,6 @@ class MessageCreateAPIView(CreateAPIView):
         ai_client = get_ai_client()
         food_data = serializer.validated_data.get('food_data')
 
-        # Toda a operação (mensagem do usuário + chamada IA + mensagem da IA) roda
-        # numa única transação: se a IA falhar, o rollback remove a mensagem do
-        # usuário e mantém o histórico consistente (HIGH-B2).
         try:
             with transaction.atomic():
                 if not chat_id:
@@ -180,14 +172,11 @@ class MessageCreateAPIView(CreateAPIView):
                         user=request.user, title=user_message_content[:15]
                     )
                 else:
-                    # Ownership enforced: chat precisa pertencer ao usuário (CRITICAL-B2).
                     chat = get_object_or_404(Chat, id=chat_id, user=request.user)
 
                 if not chat.is_active:
                     raise ChatClosedException()
 
-                # A conversa de acompanhamento só é possível quando já existe uma
-                # resposta do assistente neste chat e o client suporta o modo.
                 has_prior_assistant = Message.objects.filter(
                     chat=chat, role=Message.Role.ASSISTANT
                 ).exists()
@@ -227,8 +216,6 @@ class MessageCreateAPIView(CreateAPIView):
                     content=ai_content,
                 )
         except (Http404, APIException):
-            # 404 (chat de outro usuário/inexistente) e erros de API (ex.: chat
-            # encerrado) devem manter seu status original, não virar 500.
             raise
         except Exception as e:
             logger.error("Erro no pipeline de IA: %s", str(e), exc_info=True)
@@ -254,7 +241,6 @@ class MessageListAPIView(ListAPIView):
 
     def get_queryset(self):
         chat_id = self.kwargs['chat_id']
-        # Ownership enforced: só mensagens de chats do próprio usuário (CRITICAL-B1).
         return (
             Message.objects.filter(chat_id=chat_id, chat__user=self.request.user)
             .order_by('created_at')

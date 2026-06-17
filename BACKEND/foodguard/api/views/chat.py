@@ -25,7 +25,5 @@ class ChatDestroyAPIView(DestroyAPIView):
         return Chat.objects.filter(user=self.request.user, is_active=True)
 
     def perform_destroy(self, instance):
-        # Soft delete: BaseModel.is_active indica que o padrão é desativar, não
-        # remover fisicamente (MEDIUM-B7).
         instance.is_active = False
         instance.save(update_fields=['is_active'])

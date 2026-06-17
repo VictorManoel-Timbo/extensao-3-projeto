@@ -77,9 +77,6 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "config.urls"
 
-# TEMPLATES e FORM_RENDERER são definidos mais abaixo (versão completa com
-# context processors adicionais).
-
 WSGI_APPLICATION = "config.wsgi.application"
 
 

@@ -6,8 +6,6 @@ from foodguard.api.serializers.openfoodfacts import OpenFoodFactsSerializer
 
 
 class MessageSerializer(ModelSerializer):
-    # chat_id é opcional na escrita (ausente => cria um novo chat) e sempre
-    # presente na leitura (echo do chat ao qual a mensagem pertence).
     chat_id = UUIDField(required=False)
     food_data = OpenFoodFactsSerializer(write_only=True, required=False)
 
