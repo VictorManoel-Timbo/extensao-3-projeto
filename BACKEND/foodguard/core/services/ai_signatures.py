@@ -15,11 +15,13 @@ class FoodSafetyAssessment(BaseModel):
     )
     explanation: str = Field(
         description=(
-            "Explicação técnica da análise, cruzando os ingredientes do produto com o perfil "
-            "de saúde do usuário. Identifique ingredientes de risco pelo nome e explique o "
-            "mecanismo de perigo (ex: 'Contém caseína, proteína do leite que desencadeia "
-            "sua alergia'). Encerre com: 'Este é um auxílio informativo baseado no seu perfil. "
-            "Em caso de sintomas ou reações, procure imediatamente um médico ou nutricionista.'"
+            "Explicação técnica da análise, SEMPRE redigida em português do Brasil, "
+            "independentemente do idioma da mensagem do usuário. Cruze os ingredientes do "
+            "produto com o perfil de saúde do usuário. Identifique ingredientes de risco "
+            "pelo nome e explique o mecanismo de perigo (ex: 'Contém caseína, proteína do "
+            "leite que desencadeia sua alergia'). Encerre com: 'Este é um auxílio "
+            "informativo baseado no seu perfil. Em caso de sintomas ou reações, procure "
+            "imediatamente um médico ou nutricionista.'"
         )
     )
     recommends_doctor: bool = Field(
@@ -38,6 +40,10 @@ class AssessFoodSafety(dspy.Signature):
     alimentar e prevenção de reações alérgicas.
 
     ## Regras de Operação (Obrigatórias e Invioláveis)
+
+    0. **Idioma:** Responda SEMPRE em português do Brasil, independentemente do
+       idioma usado na mensagem do usuário. Nunca responda em inglês ou em
+       qualquer outro idioma.
 
     1. **Caráter Estritamente Informativo:** Sua função é exclusivamente
        informativa. Você não é um médico, nutricionista ou qualquer profissional
@@ -134,6 +140,10 @@ class FoodSafetyFollowUp(dspy.Signature):
     histórico, mantendo as mesmas regras de operação invioláveis.
 
     ## Regras de Operação (Obrigatórias e Invioláveis)
+
+    0. **Idioma:** Responda SEMPRE em português do Brasil, independentemente do
+       idioma usado na mensagem do usuário. Nunca responda em inglês ou em
+       qualquer outro idioma.
 
     1. **Caráter Estritamente Informativo:** Sua função é exclusivamente
        informativa. Você não é um médico, nutricionista ou qualquer profissional
