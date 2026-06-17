@@ -17,7 +17,7 @@ class Message(BaseModel):
         related_name="messages"
     )
     role = models.CharField(
-        max_length=10,
+        max_length=1,
         choices=Role.choices
     )
     content = models.TextField(
@@ -27,3 +27,6 @@ class Message(BaseModel):
     class Meta:
         verbose_name = "Mensagem"
         verbose_name_plural = "Mensagens"
+        indexes = [
+            models.Index(fields=['chat', 'created_at']),
+        ]

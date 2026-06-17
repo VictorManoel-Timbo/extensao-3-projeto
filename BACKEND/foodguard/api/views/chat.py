@@ -8,15 +8,24 @@ from foodguard.core.models.chat import Chat
 @extend_schema(summary="Lista chats do usuário")
 class ChatListAPIView(ListAPIView):
     serializer_class = ChatSerializer
-    
-    def get_queryset(self):
-        return Chat.objects.filter(user=self.request.user).order_by('-created_at')
 
-@extend_schema(summary="Deleta um chat específico do usuário")
+    def get_queryset(self):
+        return (
+            Chat.objects.filter(user=self.request.user, is_active=True)
+            .order_by('-created_at')
+        )
+
+@extend_schema(summary="Deleta (soft delete) um chat específico do usuário")
 class ChatDestroyAPIView(DestroyAPIView):
     serializer_class = ChatSerializer
     lookup_field = 'id'
     lookup_url_kwarg = 'chat_id'
 
     def get_queryset(self):
-        return Chat.objects.filter(user=self.request.user)
+        return Chat.objects.filter(user=self.request.user, is_active=True)
+
+    def perform_destroy(self, instance):
+        # Soft delete: BaseModel.is_active indica que o padrão é desativar, não
+        # remover fisicamente (MEDIUM-B7).
+        instance.is_active = False
+        instance.save(update_fields=['is_active'])

@@ -11,8 +11,13 @@ class Chat(BaseModel):
         related_name="chats"
     )
     title = models.CharField(
-        max_length=255, 
-        blank=True, 
+        max_length=255,
+        blank=True,
         null=True,
         default="Nova conversa"
     )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]

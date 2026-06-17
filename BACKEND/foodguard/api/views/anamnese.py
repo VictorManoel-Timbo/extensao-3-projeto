@@ -1,6 +1,7 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.generics import CreateAPIView
 from rest_framework.generics import RetrieveUpdateAPIView
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 
 from foodguard.api.serializers.anamnese import AnamneseSerializer
@@ -13,9 +14,11 @@ class AnamneseCreateView(CreateAPIView):
     serializer_class = AnamneseSerializer
 
     def perform_create(self, serializer):
-        if Anamnese.objects.filter(user=self.request.user).exists():
+        try:
+            with transaction.atomic():
+                serializer.save(user=self.request.user)
+        except IntegrityError:
             raise AnamneseHasAlreadyBeenCreatedException()
-        serializer.save(user=self.request.user)
 
 @extend_schema(summary="Recupera ou atualiza a anamnese do usuário")
 class AnamneseGetUpdateView(RetrieveUpdateAPIView):
@@ -26,9 +29,10 @@ class AnamneseGetUpdateView(RetrieveUpdateAPIView):
         return get_object_or_404(Anamnese, user=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save()
-        Chat.objects.filter(
-            user=self.request.user,
-            created_at__lte=serializer.instance.updated_at,
-        ).update(is_active=False)
+        with transaction.atomic():
+            serializer.save()
+            Chat.objects.filter(
+                user=self.request.user,
+                created_at__lte=serializer.instance.updated_at,
+            ).update(is_active=False)
 

@@ -2,11 +2,13 @@ import logging
 
 import dspy
 from django.conf import settings
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 
 from foodguard.api.exceptions.chat import ChatClosedException
 from foodguard.api.exceptions.message import RoleNotAllowedException
@@ -20,13 +22,27 @@ from foodguard.core.services.openai_client import OpenAIClient
 logger = logging.getLogger('django')
 
 
+class AIThrottle(UserRateThrottle):
+    """Throttle dedicado aos endpoints de IA (rate definido em settings)."""
+    scope = 'ai'
+
+
 def _build_ai_client():
     if settings.AI_PROVIDER == "openai":
         return OpenAIClient()
     return GeminiClient()
 
 
-ai_client = _build_ai_client()
+_ai_client = None
+
+
+def get_ai_client():
+    """Lazy singleton — evita instanciar o client (e exigir API key) no import,
+    o que quebraria commands como migrate/collectstatic."""
+    global _ai_client
+    if _ai_client is None:
+        _ai_client = _build_ai_client()
+    return _ai_client
 
 
 def _format_anamnesis(anamnese: Anamnese) -> str:
@@ -94,6 +110,15 @@ def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
     pending_user = None
     for message in messages:
         if message.role == Message.Role.USER:
+            if pending_user is not None:
+                # Duas mensagens de usuário consecutivas (resposta da IA ausente,
+                # ex.: falha anterior). Preservamos o turno com resposta vazia em
+                # vez de descartá-lo silenciosamente.
+                logger.warning(
+                    "Mensagem de usuário sem resposta da IA no chat %s; "
+                    "incluindo turno com answer vazia.", chat.id,
+                )
+                turns.append({"user_query": pending_user, "answer": ""})
             pending_user = message.content
         elif message.role == Message.Role.ASSISTANT and pending_user is not None:
             turns.append({"user_query": pending_user, "answer": message.content})
@@ -127,6 +152,7 @@ def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
 )
 class MessageCreateAPIView(CreateAPIView):
     serializer_class = MessageSerializer
+    throttle_classes = [AIThrottle]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -136,65 +162,76 @@ class MessageCreateAPIView(CreateAPIView):
         if role == Message.Role.ASSISTANT:
             raise RoleNotAllowedException()
 
-        chat_id = request.data.get('chat_id')
+        chat_id = serializer.validated_data.get('chat_id')
         user_message_content = serializer.validated_data.get('content', '')
 
-        if not chat_id:
-            chat = Chat.objects.create(user=request.user, title=user_message_content[:15])
-        else:
-            chat = get_object_or_404(Chat, id=chat_id)
-
-        if not chat.is_active:
-            raise ChatClosedException()
-
-        # food_data must be captured before serializer.save(), which pops it from validated_data
+        ai_client = get_ai_client()
         food_data = serializer.validated_data.get('food_data')
 
-        # A conversa de acompanhamento só é possível quando já existe uma resposta do
-        # assistente neste chat e o client de IA suporta o modo conversacional.
-        has_prior_assistant = Message.objects.filter(
-            chat=chat, role=Message.Role.ASSISTANT
-        ).exists()
-        supports_conversation = hasattr(ai_client, "continue_conversation")
-        is_follow_up = (
-            not food_data and has_prior_assistant and supports_conversation
-        )
-
-        user_message = serializer.save(chat=chat)
-
-        anamnese = Anamnese.objects.filter(user=request.user).first()
-        user_anamnesis = _format_anamnesis(anamnese) if anamnese else "Anamnese não disponível."
-
+        # Toda a operação (mensagem do usuário + chamada IA + mensagem da IA) roda
+        # numa única transação: se a IA falhar, o rollback remove a mensagem do
+        # usuário e mantém o histórico consistente (HIGH-B2).
         try:
-            if is_follow_up:
-                result = ai_client.continue_conversation(
-                    user_anamnesis=user_anamnesis,
-                    food_context=_format_food_data(food_data),
-                    history=_build_history(chat, exclude_message_id=user_message.id),
-                    user_query=user_message.content,
+            with transaction.atomic():
+                if not chat_id:
+                    chat = Chat.objects.create(
+                        user=request.user, title=user_message_content[:15]
+                    )
+                else:
+                    # Ownership enforced: chat precisa pertencer ao usuário (CRITICAL-B2).
+                    chat = get_object_or_404(Chat, id=chat_id, user=request.user)
+
+                if not chat.is_active:
+                    raise ChatClosedException()
+
+                # A conversa de acompanhamento só é possível quando já existe uma
+                # resposta do assistente neste chat e o client suporta o modo.
+                has_prior_assistant = Message.objects.filter(
+                    chat=chat, role=Message.Role.ASSISTANT
+                ).exists()
+                supports_conversation = hasattr(ai_client, "continue_conversation")
+                is_follow_up = (
+                    not food_data and has_prior_assistant and supports_conversation
                 )
-                ai_content = result["response"]
-                verdict = None
-            else:
-                result = ai_client.assess_safety(
-                    user_anamnesis=user_anamnesis,
-                    food_ingredients=_format_food_data(food_data),
-                    user_query=user_message.content,
+
+                user_message = serializer.save(chat=chat)
+
+                anamnese = Anamnese.objects.filter(user=request.user).first()
+                user_anamnesis = (
+                    _format_anamnesis(anamnese) if anamnese else "Anamnese não disponível."
                 )
-                ai_content = result["explanation"]
-                verdict = result["verdict"]
+
+                if is_follow_up:
+                    result = ai_client.continue_conversation(
+                        user_anamnesis=user_anamnesis,
+                        food_context=_format_food_data(food_data),
+                        history=_build_history(chat, exclude_message_id=user_message.id),
+                        user_query=user_message.content,
+                    )
+                    ai_content = result["response"]
+                    verdict = None
+                else:
+                    result = ai_client.assess_safety(
+                        user_anamnesis=user_anamnesis,
+                        food_ingredients=_format_food_data(food_data),
+                        user_query=user_message.content,
+                    )
+                    ai_content = result["explanation"]
+                    verdict = result["verdict"]
+
+                ai_message = Message.objects.create(
+                    chat=chat,
+                    role=Message.Role.ASSISTANT,
+                    content=ai_content,
+                )
+        except ChatClosedException:
+            raise
         except Exception as e:
             logger.error("Erro no pipeline de IA: %s", str(e), exc_info=True)
             return Response(
                 {"error": "Erro ao processar sua resposta"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        ai_message = Message.objects.create(
-            chat=chat,
-            role=Message.Role.ASSISTANT,
-            content=ai_content,
-        )
 
         return Response(
             {
@@ -213,4 +250,8 @@ class MessageListAPIView(ListAPIView):
 
     def get_queryset(self):
         chat_id = self.kwargs['chat_id']
-        return Message.objects.filter(chat_id=chat_id).order_by('created_at')
+        # Ownership enforced: só mensagens de chats do próprio usuário (CRITICAL-B1).
+        return (
+            Message.objects.filter(chat_id=chat_id, chat__user=self.request.user)
+            .order_by('created_at')
+        )

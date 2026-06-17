@@ -53,9 +53,6 @@ THIRD_PARTY_APPS = [
     "crispy_forms",
     "crispy_tailwind",
     "django_tailwind_cli",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
     "rest_framework",
     "rest_framework.authtoken",
     "rest_framework_simplejwt",
@@ -76,7 +73,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
