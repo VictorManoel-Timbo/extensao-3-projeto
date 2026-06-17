@@ -3,9 +3,11 @@ import logging
 import dspy
 from django.conf import settings
 from django.db import transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
+from rest_framework.exceptions import APIException
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
@@ -224,7 +226,9 @@ class MessageCreateAPIView(CreateAPIView):
                     role=Message.Role.ASSISTANT,
                     content=ai_content,
                 )
-        except ChatClosedException:
+        except (Http404, APIException):
+            # 404 (chat de outro usuário/inexistente) e erros de API (ex.: chat
+            # encerrado) devem manter seu status original, não virar 500.
             raise
         except Exception as e:
             logger.error("Erro no pipeline de IA: %s", str(e), exc_info=True)
