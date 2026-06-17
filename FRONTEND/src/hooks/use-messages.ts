@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Chat } from "@/models/chat.model";
 import { MessageRole } from "@/enums/MessageRole";
-import type { Message as BackendMessage } from "@/models/message.model";
+import type { Message as BackendMessage, Verdict } from "@/models/message.model";
 import type { IOpenFoodProduct } from "@/models/open-food.model";
 import { messageService } from "@/services/message.service";
 
@@ -12,6 +12,7 @@ export interface Message {
   image?: File;
   imageUrl?: string;
   pending?: boolean;
+  verdict?: Verdict | null;
 }
 
 // Chave temporária de um chat ainda não persistido no backend (não deve gerar fetch).
@@ -26,6 +27,7 @@ function mapBackendMessages(messages: BackendMessage[]): Message[] {
     id: `${m.created_at}-${i}`,
     role: mapRole(m.role),
     text: m.content,
+    verdict: m.verdict,
   }));
 }
 
@@ -146,7 +148,8 @@ export const useMessages = (
         const resolvedChatId = res.chat_id;
 
         if (!currentChatId) {
-          const title = (finalMessage || productName || "Nova conversa").slice(
+          // Título: nome do produto escaneado quando houver, senão a mensagem.
+          const title = (productName || finalMessage || "Nova conversa").slice(
             0,
             28,
           );
@@ -170,7 +173,7 @@ export const useMessages = (
               ...rest,
               [resolvedChatId]: tempMessages.map((m) =>
                 m.id === pendingMsg.id
-                  ? { ...m, text: res.response, pending: false }
+                  ? { ...m, text: res.response, pending: false, verdict: res.verdict }
                   : m,
               ),
             };
@@ -180,7 +183,7 @@ export const useMessages = (
             ...prev,
             [resolvedChatId]: (prev[resolvedChatId] ?? []).map((m) =>
               m.id === pendingMsg.id
-                ? { ...m, text: res.response, pending: false }
+                ? { ...m, text: res.response, pending: false, verdict: res.verdict }
                 : m,
             ),
           }));

@@ -1,11 +1,19 @@
 import { type MessageRole } from "@/enums/MessageRole";
 import type { IOpenFoodProduct } from "@/models/open-food.model";
 
+export type Verdict =
+  | "SAFE"
+  | "LOW_CONCERN"
+  | "MODERATE_RISK"
+  | "HIGH_RISK"
+  | "INSUFFICIENT_DATA";
+
 export interface Message {
   chat_id: string;
   role: MessageRole;
   content: string;
   created_at: string;
+  verdict: Verdict | null;
 }
 
 export interface MessageCreateRequest {
@@ -19,4 +27,6 @@ export interface MessageCreateRequest {
 export interface MessageCreateResponse {
   chat_id: string;
   response: string;
+  verdict: Verdict | null;
+  recommends_doctor: boolean;
 }

@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import type { Verdict } from "@/models/message.model";
+import { VERDICT_META } from "@/lib/verdict";
 
 export type Message = {
     id: string;
@@ -7,6 +9,18 @@ export type Message = {
     image?: File;
     imageUrl?: string;
     pending?: boolean;
+    verdict?: Verdict | null;
+};
+
+const VerdictBadge = ({ verdict }: { verdict: Verdict }) => {
+    const meta = VERDICT_META[verdict];
+    return (
+        <span
+            className={`mb-2 inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wide ${meta.className}`}
+        >
+            {meta.label}
+        </span>
+    );
 };
 
 const TypingDots = () => (
@@ -60,7 +74,8 @@ const ChatMessages = ({ messages }: { messages: Message[] }) => {
                                 <span className="text-black">Sua mensagem está sendo processada ...</span>
                             </div>
                         ) : (
-                            <div className="max-w-[85%] rounded-2xl rounded-ss border border-zinc-400 bg-white px-6 py-5 text-black shadow shadow-black/15">
+                            <div className="flex max-w-[85%] flex-col rounded-2xl rounded-ss border border-zinc-400 bg-white px-6 py-5 text-black shadow shadow-black/15">
+                                {m.verdict && <VerdictBadge verdict={m.verdict} />}
                                 {m.text.split("\n\n").map((p, i) => (
                                     <p key={`${m.id}-${i}`} className={i > 0 ? "mt-4" : ""}>{p}</p>
                                 ))}
