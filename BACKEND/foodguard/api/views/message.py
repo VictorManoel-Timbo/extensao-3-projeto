@@ -1,5 +1,7 @@
 import logging
 
+import dspy
+from django.conf import settings
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
@@ -13,9 +15,18 @@ from foodguard.core.models.anamnese import Anamnese
 from foodguard.core.models.chat import Chat
 from foodguard.core.models.message import Message
 from foodguard.core.services.gemini_client import GeminiClient
+from foodguard.core.services.openai_client import OpenAIClient
 
-gemini_client = GeminiClient()
 logger = logging.getLogger('django')
+
+
+def _build_ai_client():
+    if settings.AI_PROVIDER == "openai":
+        return OpenAIClient()
+    return GeminiClient()
+
+
+ai_client = _build_ai_client()
 
 
 def _format_anamnesis(anamnese: Anamnese) -> str:
@@ -68,12 +79,37 @@ def _format_food_data(food_data: dict | None) -> str:
     ])
 
 
+def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
+    """Monta o histórico DSPy pareando mensagens U -> A em ordem cronológica.
+
+    Exclui a mensagem de usuário recém-salva (a que está sendo respondida agora).
+    """
+    messages = (
+        Message.objects.filter(chat=chat)
+        .exclude(id=exclude_message_id)
+        .order_by('created_at')
+    )
+
+    turns = []
+    pending_user = None
+    for message in messages:
+        if message.role == Message.Role.USER:
+            pending_user = message.content
+        elif message.role == Message.Role.ASSISTANT and pending_user is not None:
+            turns.append({"user_query": pending_user, "answer": message.content})
+            pending_user = None
+
+    return dspy.History(messages=turns)
+
+
 @extend_schema(
     summary="Cria uma nova mensagem de chat",
     description=(
         "Recebe o texto do usuário e, opcionalmente, dados de produto via OpenFoodFacts. "
-        "Executa o pipeline DSPy de análise de segurança alimentar e retorna o veredito "
-        "nutricional estruturado."
+        "Na primeira interação (ou quando um produto é enviado) executa o pipeline DSPy de "
+        "análise de segurança alimentar e retorna o veredito estruturado (verdict). Em "
+        "mensagens de acompanhamento sem produto, responde em modo conversacional usando o "
+        "histórico do chat (verdict = null). O modo conversacional requer AI_PROVIDER=openai."
     ),
     responses={
         201: inline_serializer(
@@ -81,7 +117,9 @@ def _format_food_data(food_data: dict | None) -> str:
             fields={
                 "chat_id": serializers.UUIDField(),
                 "response": serializers.CharField(),
-                "verdict": serializers.ChoiceField(choices=["SAFE", "DANGEROUS"]),
+                "verdict": serializers.ChoiceField(
+                    choices=["SAFE", "DANGEROUS"], allow_null=True
+                ),
                 "recommends_doctor": serializers.BooleanField(),
             },
         )
@@ -111,18 +149,40 @@ class MessageCreateAPIView(CreateAPIView):
 
         # food_data must be captured before serializer.save(), which pops it from validated_data
         food_data = serializer.validated_data.get('food_data')
+
+        # A conversa de acompanhamento só é possível quando já existe uma resposta do
+        # assistente neste chat e o client de IA suporta o modo conversacional.
+        has_prior_assistant = Message.objects.filter(
+            chat=chat, role=Message.Role.ASSISTANT
+        ).exists()
+        supports_conversation = hasattr(ai_client, "continue_conversation")
+        is_follow_up = (
+            not food_data and has_prior_assistant and supports_conversation
+        )
+
         user_message = serializer.save(chat=chat)
 
         anamnese = Anamnese.objects.filter(user=request.user).first()
         user_anamnesis = _format_anamnesis(anamnese) if anamnese else "Anamnese não disponível."
-        food_ingredients = _format_food_data(food_data)
 
         try:
-            result = gemini_client.assess_safety(
-                user_anamnesis=user_anamnesis,
-                food_ingredients=food_ingredients,
-                user_query=user_message.content,
-            )
+            if is_follow_up:
+                result = ai_client.continue_conversation(
+                    user_anamnesis=user_anamnesis,
+                    food_context=_format_food_data(food_data),
+                    history=_build_history(chat, exclude_message_id=user_message.id),
+                    user_query=user_message.content,
+                )
+                ai_content = result["response"]
+                verdict = None
+            else:
+                result = ai_client.assess_safety(
+                    user_anamnesis=user_anamnesis,
+                    food_ingredients=_format_food_data(food_data),
+                    user_query=user_message.content,
+                )
+                ai_content = result["explanation"]
+                verdict = result["verdict"]
         except Exception as e:
             logger.error("Erro no pipeline de IA: %s", str(e), exc_info=True)
             return Response(
@@ -133,14 +193,14 @@ class MessageCreateAPIView(CreateAPIView):
         ai_message = Message.objects.create(
             chat=chat,
             role=Message.Role.ASSISTANT,
-            content=result["explanation"],
+            content=ai_content,
         )
 
         return Response(
             {
                 "chat_id": chat.id,
                 "response": ai_message.content,
-                "verdict": result["verdict"],
+                "verdict": verdict,
                 "recommends_doctor": result["recommends_doctor"],
             },
             status=status.HTTP_201_CREATED,

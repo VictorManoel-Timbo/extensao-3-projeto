@@ -241,11 +241,19 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
+# AI provider selection: "gemini" | "openai"
+AI_PROVIDER = env("AI_PROVIDER", default="gemini")
+
 # Gemini API
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "default_api_key")
 GEMINI_MODEL_NAME = "gemini-2.5-flash"
 GEMINI_TEMPERATURE = 0.7
 SYSTEM_PROMPT_PATH = os.path.join(BASE_DIR, "data", "system_prompt.md")
+
+# OpenAI API
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+OPENAI_MODEL_NAME = env("OPENAI_MODEL_NAME", default="gpt-5o")
+OPENAI_TEMPERATURE = env.float("OPENAI_TEMPERATURE", default=0.7)
 
 # LOGGER CONFIGURATION
 # settings.py
