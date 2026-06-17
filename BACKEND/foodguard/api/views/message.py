@@ -70,12 +70,36 @@ def _format_anamnesis(anamnese: Anamnese) -> str:
     return "\n".join(lines)
 
 
+_NUTRIMENT_FIELDS = [
+    ("energy-kcal_100g", "Energia", "kcal"),
+    ("carbohydrates_100g", "Carboidratos", "g"),
+    ("sugars_100g", "Açúcares", "g"),
+    ("fat_100g", "Gorduras totais", "g"),
+    ("saturated-fat_100g", "Gorduras saturadas", "g"),
+    ("fiber_100g", "Fibras", "g"),
+    ("proteins_100g", "Proteínas", "g"),
+    ("salt_100g", "Sal", "g"),
+    ("sodium_100g", "Sódio", "g"),
+]
+
+
+def _format_nutriments(nutriments: dict | None) -> str:
+    if not nutriments:
+        return ""
+    parts = [
+        f"{label}: {nutriments[key]}{unit}"
+        for key, label, unit in _NUTRIMENT_FIELDS
+        if nutriments.get(key) is not None
+    ]
+    return "; ".join(parts)
+
+
 def _format_food_data(food_data: dict | None) -> str:
     if not food_data:
         return "Nenhum produto específico fornecido. Análise baseada apenas na query do usuário."
 
     product = food_data.get('product', {})
-    product_name = product.get('product_name', 'Nome não disponível')
+    product_name = product.get('product_name') or 'Nome não disponível'
 
     ingredients = product.get('ingredients', [])
     ingredient_list = ", ".join(
@@ -83,16 +107,24 @@ def _format_food_data(food_data: dict | None) -> str:
         for ing in ingredients
         if ing.get('text')
     )
+    if not ingredient_list:
+        ingredient_list = (product.get('ingredients_text') or "").strip()
 
     allergens = ", ".join(product.get('allergens_tags', [])) or "Nenhum declarado"
     additives = ", ".join(product.get('additives_tags', [])) or "Nenhum"
 
-    return "\n".join([
+    lines = [
         f"Produto: {product_name}",
         f"Ingredientes: {ingredient_list or 'Não disponível'}",
         f"Alérgenos declarados: {allergens}",
         f"Aditivos: {additives}",
-    ])
+    ]
+
+    nutriments = _format_nutriments(product.get('nutriments'))
+    if nutriments:
+        lines.append(f"Informação nutricional (por 100g): {nutriments}")
+
+    return "\n".join(lines)
 
 
 def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
