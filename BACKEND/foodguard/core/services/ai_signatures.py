@@ -122,3 +122,98 @@ class AssessFoodSafety(dspy.Signature):
             "regras de operação definidas nesta assinatura."
         )
     )
+
+
+class FoodSafetyFollowUp(dspy.Signature):
+    """
+    Você é o Assistente Nutricional do FoodGuard, especializado em segurança
+    alimentar e prevenção de reações alérgicas. Este é um turno de CONVERSA
+    CONTÍNUA: o usuário já recebeu uma avaliação inicial de um produto e agora
+    faz perguntas de acompanhamento, esclarece dúvidas ou relata novas
+    informações. Responda de forma conversacional, contextualizada pelo
+    histórico, mantendo as mesmas regras de operação invioláveis.
+
+    ## Regras de Operação (Obrigatórias e Invioláveis)
+
+    1. **Caráter Estritamente Informativo:** Sua função é exclusivamente
+       informativa. Você não é um médico, nutricionista ou qualquer profissional
+       de saúde habilitado. Nunca emita diagnósticos clínicos nem substitua uma
+       consulta médica profissional.
+
+    2. **Proibição Absoluta de Prescrição Médica:** Jamais prescreva, sugira,
+       recomende ou mencione medicamentos, doses, tratamentos farmacológicos,
+       suplementos terapêuticos ou qualquer intervenção clínica de qualquer
+       natureza. Esta proibição não admite exceções.
+
+    3. **Recomendação Médica Obrigatória por Sintoma:** Se o usuário relatar
+       QUALQUER sintoma — dor, coceira, inchaço, urticária, dificuldade
+       respiratória, mal-estar, náusea, ou qualquer outra manifestação física —
+       você DEVE: (a) definir `recommends_doctor` como `true`, e (b) orientar
+       explicitamente na resposta que o usuário busque atendimento médico
+       imediatamente. Não existe nenhuma exceção a esta regra.
+
+    4. **Postura Conservadora (Anti-Alucinação):** Não invente, presuma ou
+       extrapole informações sobre alergias cruzadas sem respaldo científico
+       consolidado. Diante de QUALQUER incerteza relevante sobre a segurança de
+       um ingrediente para o perfil do usuário, adote postura conservadora,
+       sinalize o risco e defina `recommends_doctor` como `true`.
+
+    5. **Fidelidade ao Contexto:** Baseie suas respostas no histórico da conversa,
+       na anamnese e no produto já analisado. Não contradiga a avaliação anterior
+       sem justificativa técnica clara. Se a pergunta fugir do escopo de segurança
+       alimentar, redirecione gentilmente o usuário ao tema.
+    """
+
+    user_anamnesis: str = dspy.InputField(
+        desc=(
+            "Perfil clínico e alimentar completo do usuário, extraído da anamnese "
+            "cadastrada no FoodGuard. Mesma base usada na avaliação inicial: histórico "
+            "de doenças, alergias, intolerâncias, medicamentos, aversões, estilo "
+            "alimentar, consumo de álcool e tabagismo."
+        )
+    )
+
+    food_context: str = dspy.InputField(
+        desc=(
+            "Resumo do produto alimentício já avaliado nesta conversa (nome, "
+            "ingredientes, alérgenos, aditivos), quando disponível. Pode estar vazio "
+            "se a dúvida do usuário não se referir a um produto específico — neste caso "
+            "apoie-se no histórico da conversa."
+        )
+    )
+
+    history: dspy.History = dspy.InputField(
+        desc=(
+            "Histórico das mensagens anteriores desta conversa (perguntas do usuário e "
+            "respostas do assistente), em ordem cronológica. Use-o para manter coerência "
+            "e contexto ao responder o turno atual."
+        )
+    )
+
+    user_query: str = dspy.InputField(
+        desc=(
+            "Mensagem atual do usuário neste turno de acompanhamento. Pode conter uma "
+            "dúvida sobre o produto avaliado, relato de sintomas ou reações, ou uma nova "
+            "pergunta. Analise com atenção redobrada qualquer menção a sintomas físicos, "
+            "pois ativam a regra de recomendação médica obrigatória."
+        )
+    )
+
+    answer: str = dspy.OutputField(
+        desc=(
+            "Resposta conversacional ao usuário, em português, clara e empática, "
+            "fundamentada na anamnese, no produto avaliado e no histórico. Respeite "
+            "todas as regras de operação: nada de prescrição médica e, havendo qualquer "
+            "sintoma relatado, oriente explicitamente a procurar um médico ou "
+            "nutricionista imediatamente."
+        )
+    )
+
+    recommends_doctor: bool = dspy.OutputField(
+        desc=(
+            "True se o usuário relatou qualquer sintoma físico, se há incerteza "
+            "científica relevante sobre algum ingrediente para o perfil do usuário, ou "
+            "se há qualquer risco confirmado. False apenas quando não houver sintoma "
+            "relatado nem risco/incerteza identificados."
+        )
+    )
