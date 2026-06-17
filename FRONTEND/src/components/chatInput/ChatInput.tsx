@@ -13,7 +13,7 @@ type ChatInputProps = {
 
 const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const [value, setValue] = useState("");
-  const [image, setImage] = useState<File | null>();
+  const [image, setImage] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -24,7 +24,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
 
   const isBusy = disabled || isScanning || isProductLoading;
 
-  const handleSubmit = (e: React.SubmitEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault();
     if (isBusy || (!value.trim() && !image)) return;
 
@@ -151,12 +151,14 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           className="hidden"
         />
 
-        <div
+        <button
+          type="button"
           onClick={() => fileRef.current?.click()}
+          aria-label="Escanear código de barras"
           className="flex items-center justify-center bg-transparent p-2 cursor-pointer rounded-full transition-all"
         >
           <LuScanBarcode className="text-2xl text-black" />
-        </div>
+        </button>
 
         <textarea
           ref={textareaRef}

@@ -1,7 +1,19 @@
-import { createContext, useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { authService } from "@/services/auth.service";
 import { tokenStorage } from "@/config/tokenStorage";
-import type { AuthUser, LoginRequest, RegisterRequest } from "@/models/auth.model";
+import { AUTH_LOGOUT_EVENT } from "@/lib/events";
+import type {
+  AuthUser,
+  LoginRequest,
+  RegisterRequest,
+} from "@/models/auth.model";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -19,7 +31,9 @@ interface AuthContextValue {
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUserState] = useState<AuthUser | null>(() => tokenStorage.getUser());
+  const [user, setUserState] = useState<AuthUser | null>(() =>
+    tokenStorage.getUser(),
+  );
   const [hasAnamnese, setHasAnamnese] = useState<boolean>(
     () => tokenStorage.getUser()?.has_anamnese ?? false,
   );
@@ -30,23 +44,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setHasAnamnese(next.has_anamnese);
   }, []);
 
-  const login = useCallback(async (body: LoginRequest) => {
-    const data = await authService.login(body);
-    setUserState(data.user);
-    setHasAnamnese(data.has_anamnese);
-  }, []);
-
-  const register = useCallback(async (body: RegisterRequest) => {
-    const data = await authService.registrar(body);
-    setUserState(data.user);
-    setHasAnamnese(data.has_anamnese);
-  }, []);
-
-  const logout = useCallback(async () => {
-    await authService.logout();
+  const clearAuth = useCallback(() => {
     setUserState(null);
     setHasAnamnese(false);
   }, []);
+
+  const login = useCallback(
+    async (body: LoginRequest) => {
+      const data = await authService.login(body);
+      persistUser(data.user);
+    },
+    [persistUser],
+  );
+
+  const register = useCallback(
+    async (body: RegisterRequest) => {
+      const data = await authService.registrar(body);
+      persistUser(data.user);
+    },
+    [persistUser],
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // Mesmo que a invalidação no backend falhe, limpamos o estado local
+      // (o storage já é limpo no finally do authService.logout).
+    } finally {
+      clearAuth();
+    }
+  }, [clearAuth]);
+
+  useEffect(() => {
+    window.addEventListener(AUTH_LOGOUT_EVENT, clearAuth);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, clearAuth);
+  }, [clearAuth]);
 
   const markAnamneseDone = useCallback(() => {
     setHasAnamnese(true);
@@ -58,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
-      isAuthenticated: !!tokenStorage.getAccess() && !!user,
+      isAuthenticated: !!user,
       hasAnamnese,
       login,
       register,

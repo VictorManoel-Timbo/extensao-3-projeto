@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Chat } from "@/models/chat.model";
 import { MessageRole } from "@/enums/MessageRole";
 import type { Message as BackendMessage } from "@/models/message.model";
@@ -13,6 +13,9 @@ export interface Message {
   imageUrl?: string;
   pending?: boolean;
 }
+
+// Chave temporária de um chat ainda não persistido no backend (não deve gerar fetch).
+const NEW_CHAT_KEY = "__new__";
 
 function mapRole(role: MessageRole): "user" | "assistant" {
   return role === MessageRole.User ? "user" : "assistant";
@@ -31,15 +34,22 @@ export const useMessages = (
   setActiveId: (id: string | null) => void,
   addChat: (chat: Chat) => void,
 ) => {
-  const [messagesByChat, setMessagesByChat] = useState<Record<string, Message[]>>({});
+  const [messagesByChat, setMessagesByChat] = useState<
+    Record<string, Message[]>
+  >({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fetchedChatsRef = useRef<Set<string>>(new Set());
+  const objectUrlsRef = useRef<Set<string>>(new Set());
 
   const messages = activeId ? (messagesByChat[activeId] ?? []) : [];
   const isChatPending = messages.some((m) => m.pending);
 
   useEffect(() => {
-    if (!activeId || messagesByChat[activeId]) return;
+    // Não busca para o placeholder de chat novo (ainda não existe no backend).
+    if (!activeId || activeId === NEW_CHAT_KEY || fetchedChatsRef.current.has(activeId))
+      return;
+    fetchedChatsRef.current.add(activeId);
 
     setLoading(true);
     messageService
@@ -50,11 +60,23 @@ export const useMessages = (
           [activeId]: mapBackendMessages(data),
         }));
       })
-      .catch(() => setError("Erro ao carregar mensagens."))
+      .catch(() => {
+        fetchedChatsRef.current.delete(activeId);
+        setError("Erro ao carregar mensagens.");
+      })
       .finally(() => setLoading(false));
-  }, [activeId, messagesByChat]);
+  }, [activeId]);
+
+  useEffect(() => {
+    const urls = objectUrlsRef.current;
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+      urls.clear();
+    };
+  }, []);
 
   const clearMessages = (chatId: string) => {
+    fetchedChatsRef.current.delete(chatId);
     setMessagesByChat((prev) => {
       const copy = { ...prev };
       delete copy[chatId];
@@ -62,7 +84,13 @@ export const useMessages = (
     });
   };
 
-  const handleSend = (text: string, image?: File, product?: IOpenFoodProduct) => {
+  const handleSend = (
+    text: string,
+    image?: File,
+    product?: IOpenFoodProduct,
+  ) => {
+    if (isChatPending) return;
+
     const productName = product?.product.product_name;
 
     let finalMessage = text;
@@ -74,16 +102,19 @@ export const useMessages = (
       }
     }
 
+    const imageUrl = image ? URL.createObjectURL(image) : undefined;
+    if (imageUrl) objectUrlsRef.current.add(imageUrl);
+
     const userMsg: Message = {
-      id: `u${Date.now()}`,
+      id: `u${crypto.randomUUID()}`,
       role: "user",
       text: finalMessage,
       image,
-      imageUrl: image ? URL.createObjectURL(image) : undefined,
+      imageUrl,
     };
 
     const pendingMsg: Message = {
-      id: `p${Date.now()}`,
+      id: `p${crypto.randomUUID()}`,
       role: "assistant",
       text: "",
       pending: true,
@@ -93,15 +124,15 @@ export const useMessages = (
 
     setMessagesByChat((prev) => ({
       ...prev,
-      [currentChatId ?? "__new__"]: [
-        ...(prev[currentChatId ?? "__new__"] ?? []),
+      [currentChatId ?? NEW_CHAT_KEY]: [
+        ...(prev[currentChatId ?? NEW_CHAT_KEY] ?? []),
         userMsg,
         pendingMsg,
       ],
     }));
 
     if (!currentChatId) {
-      setActiveId("__new__");
+      setActiveId(NEW_CHAT_KEY);
     }
 
     messageService
@@ -114,7 +145,10 @@ export const useMessages = (
         const resolvedChatId = res.chat_id;
 
         if (!currentChatId) {
-          const title = (finalMessage || productName || "Nova conversa").slice(0, 28);
+          const title = (finalMessage || productName || "Nova conversa").slice(
+            0,
+            28,
+          );
           addChat({
             id: resolvedChatId,
             title,
@@ -122,11 +156,15 @@ export const useMessages = (
             is_active: true,
             messages: "",
           });
+          // Já temos as mensagens otimistas deste chat; evita refetch (e perda da
+          // imagem em blob local) ao trocar o activeId para o id real.
+          fetchedChatsRef.current.add(resolvedChatId);
           setActiveId(resolvedChatId);
 
           setMessagesByChat((prev) => {
-            const tempMessages = prev["__new__"] ?? [];
-            const { __new__, ...rest } = prev;
+            const tempMessages = prev[NEW_CHAT_KEY] ?? [];
+            const rest = { ...prev };
+            delete rest[NEW_CHAT_KEY];
             return {
               ...rest,
               [resolvedChatId]: tempMessages.map((m) =>
@@ -148,12 +186,16 @@ export const useMessages = (
         }
       })
       .catch(() => {
-        const chatKey = currentChatId ?? "__new__";
+        const chatKey = currentChatId ?? NEW_CHAT_KEY;
         setMessagesByChat((prev) => ({
           ...prev,
           [chatKey]: (prev[chatKey] ?? []).map((m) =>
             m.id === pendingMsg.id
-              ? { ...m, text: "Erro ao processar sua mensagem. Tente novamente.", pending: false }
+              ? {
+                  ...m,
+                  text: "Erro ao processar sua mensagem. Tente novamente.",
+                  pending: false,
+                }
               : m,
           ),
         }));

@@ -17,7 +17,7 @@ const AuthLayout = ({ children, wide = false }: AuthLayoutProps) => {
                         FoodGuard
                     </span>
                 </Link>
-                <div className="w-full flex flex-col animate-fade-in rounded-2xl border border-zinc-500 bg-white gap-y-12 p-12 shadow-md sm:p-10">
+                <div className="w-full flex flex-col animate-fade-in rounded-2xl border border-zinc-500 bg-white gap-y-12 p-8 shadow-md sm:p-12">
                     {children}
                 </div>
             </div>

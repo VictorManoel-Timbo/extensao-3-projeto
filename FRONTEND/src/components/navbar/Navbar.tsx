@@ -21,12 +21,16 @@ const scrollTo = (id: string) => {
 
 const NavBar = ({ variant = "home" }: NavBarProps) => {
     const navigate = useNavigate();
-    const { logout } = useAuth();
+    const { logout, isAuthenticated } = useAuth();
     const [profileOpen, setProfileOpen] = useState(false);
 
     const handleLogout = async () => {
-        await logout();
-        navigate("/", { replace: true });
+        try {
+            await logout();
+            navigate("/", { replace: true });
+        } catch (err) {
+            console.error("Erro ao sair:", err);
+        }
     };
 
     return (
@@ -70,35 +74,57 @@ const NavBar = ({ variant = "home" }: NavBarProps) => {
                     </nav>
                 </div>
 
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <div
-                            className="flex items-center justify-center bg-red-500/20 rounded-full p-4 max-w-14 max-h-14 shadow-sm shadow-black/15 cursor-pointer"
-                            aria-label="Perfil de usuário"
+                {isAuthenticated ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                type="button"
+                                className="flex items-center justify-center bg-red-500/20 rounded-full p-4 max-w-14 max-h-14 shadow-sm shadow-black/15 cursor-pointer"
+                                aria-label="Perfil de usuário"
+                            >
+                                <FiUser className="text-4xl text-red-500 font-extrabold" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="bg-white border border-zinc-500 font-medium">
+                            <DropdownMenuGroup>
+                                <DropdownMenuItem
+                                    onSelect={() => setProfileOpen(true)}
+                                    className="outline-none hover:bg-foodguard-300/50 active:bg-foodguard-300"
+                                >
+                                    Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={handleLogout}
+                                    className="text-red-700 outline-none hover:bg-red-300 active:bg-red-400"
+                                >
+                                    Sair
+                                </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => navigate("/login")}
+                            className="rounded-full border border-zinc-500 bg-white px-5 py-3 text-base font-semibold text-black shadow-sm shadow-black/15 transition-colors hover:bg-slate-100"
                         >
-                            <FiUser className="text-4xl text-red-500 font-extrabold" />
-                        </div>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="bg-white border border-zinc-500 font-medium">
-                        <DropdownMenuGroup>
-                            <DropdownMenuItem
-                                onSelect={() => setProfileOpen(true)}
-                                className="outline-none hover:bg-foodguard-300/50 active:bg-foodguard-300"
-                            >
-                                Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onSelect={handleLogout}
-                                className="text-red-700 outline-none hover:bg-red-300 active:bg-red-400"
-                            >
-                                Sair
-                            </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                            Entrar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate("/cadastro")}
+                            className="rounded-full bg-foodguard-500 px-5 py-3 text-base font-semibold text-white shadow-sm shadow-black/15 transition-colors hover:bg-foodguard-500/90"
+                        >
+                            Cadastrar
+                        </button>
+                    </div>
+                )}
             </div>
 
-            <EditProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+            {isAuthenticated && (
+                <EditProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
+            )}
         </header>
     );
 };

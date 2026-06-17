@@ -19,7 +19,14 @@ export const tokenStorage = {
 
   getUser: (): AuthUser | null => {
     const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as AuthUser;
+    } catch {
+      // Dados corrompidos no storage — limpa e retorna null.
+      tokenStorage.clear();
+      return null;
+    }
   },
 
   setUser: (user: AuthUser): void => {

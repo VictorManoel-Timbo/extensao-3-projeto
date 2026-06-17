@@ -2,11 +2,9 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const members = [
-  { name: "Membro 1", role: "Frontend", initials: "M1" },
-  { name: "Membro 2", role: "Backend", initials: "M2" },
-  { name: "Membro 3", role: "IA / ML", initials: "M3" },
-  { name: "Membro 4", role: "UX / UI", initials: "M4" },
-  { name: "Membro 5", role: "QA / DevOps", initials: "M5" },
+  { name: "Aristóteles Feitosa", role: "Desenvolvedor", initials: "AF" },
+  { name: "Pedro Otávio de Sousa Bezerra", role: "Desenvolvedor", initials: "PB" },
+  { name: "Victor Manoel Magalhães Timbó", role: "Desenvolvedor", initials: "VT" },
 ];
 
 export function Team() {

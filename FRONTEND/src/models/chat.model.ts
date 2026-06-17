@@ -3,6 +3,7 @@ export interface Chat {
   title: string | null;
   created_at: string;
   is_active: boolean;
+  /** URL (HyperlinkedIdentityField) para o endpoint de mensagens deste chat. */
   messages: string;
 }
 

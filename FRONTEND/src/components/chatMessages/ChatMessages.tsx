@@ -62,7 +62,7 @@ const ChatMessages = ({ messages }: { messages: Message[] }) => {
                         ) : (
                             <div className="max-w-[85%] rounded-2xl rounded-ss border border-zinc-400 bg-white px-6 py-5 text-black shadow shadow-black/15">
                                 {m.text.split("\n\n").map((p, i) => (
-                                    <p key={i} className={i > 0 ? "mt-4" : ""}>{p}</p>
+                                    <p key={`${m.id}-${i}`} className={i > 0 ? "mt-4" : ""}>{p}</p>
                                 ))}
                             </div>
                         )}

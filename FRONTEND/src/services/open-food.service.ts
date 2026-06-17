@@ -13,7 +13,7 @@ type OpenFoodPayload = {
 };
 
 export const openFoodService = {
-    getProdut: async (payload: OpenFoodPayload): Promise<IOpenFoodProduct> => {
+    getProduct: async (payload: OpenFoodPayload): Promise<IOpenFoodProduct> => {
         const fieldsString = payload.fields?.join(",") || DEFAULT_FIELDS;
 
         return await openFoodRest.getProduct(payload.barcode, {

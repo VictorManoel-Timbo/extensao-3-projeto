@@ -1,24 +1,10 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AxiosError } from "axios";
 import { Calendar, Eye, EyeOff, Mail, User } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { PASSWORD_REGEX, inputClass, extractError } from "@/lib/anamnese.constants";
 
 const NAME_REGEX = /^[a-zA-ZÀ-ÿ '-]+$/;
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-
-const inputClass =
-    "h-12 w-full rounded-md border border-zinc-500 bg-slate-50 px-4 pr-10 placeholder:text-gray-700 focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30";
-
-const extractError = (err: unknown): string => {
-    if (err instanceof AxiosError && err.response?.data) {
-        const data = err.response.data as Record<string, unknown>;
-        const first = Object.values(data)[0];
-        if (Array.isArray(first)) return String(first[0]);
-        if (typeof first === "string") return first;
-    }
-    return "Não foi possível concluir o cadastro. Tente novamente.";
-};
 
 const CadastroForm = () => {
     const navigate = useNavigate();
@@ -67,7 +53,7 @@ const CadastroForm = () => {
             });
             navigate("/anamnese", { replace: true });
         } catch (err) {
-            setError(extractError(err));
+            setError(extractError(err, "Não foi possível concluir o cadastro. Tente novamente."));
         } finally {
             setSubmitting(false);
         }
@@ -88,9 +74,10 @@ const CadastroForm = () => {
 
                 <div className="grid gap-6 sm:grid-cols-2">
                     <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-black">Nome completo</label>
+                        <label htmlFor="cadastro-nome" className="block text-sm font-semibold text-black">Nome completo</label>
                         <div className="relative">
                             <input
+                                id="cadastro-nome"
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
@@ -104,9 +91,10 @@ const CadastroForm = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-black">Seu usuário</label>
+                        <label htmlFor="cadastro-usuario" className="block text-sm font-semibold text-black">Seu usuário</label>
                         <div className="relative">
                             <input
+                                id="cadastro-usuario"
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -119,9 +107,10 @@ const CadastroForm = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-black">Seu email</label>
+                        <label htmlFor="cadastro-email" className="block text-sm font-semibold text-black">Seu email</label>
                         <div className="relative">
                             <input
+                                id="cadastro-email"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
@@ -134,9 +123,10 @@ const CadastroForm = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-black">Data de nascimento</label>
+                        <label htmlFor="cadastro-dob" className="block text-sm font-semibold text-black">Data de nascimento</label>
                         <div className="relative">
                             <input
+                                id="cadastro-dob"
                                 type="date"
                                 value={dob}
                                 onChange={(e) => setDob(e.target.value)}
@@ -147,9 +137,10 @@ const CadastroForm = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-black">Sua senha</label>
+                        <label htmlFor="cadastro-senha" className="block text-sm font-semibold text-black">Sua senha</label>
                         <div className="relative">
                             <input
+                                id="cadastro-senha"
                                 type={showPwd ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -161,7 +152,7 @@ const CadastroForm = () => {
                                 type="button"
                                 onClick={() => setShowPwd((s) => !s)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-800 hover:text-black"
-                                aria-label="Mostrar senha"
+                                aria-label={showPwd ? "Ocultar senha" : "Mostrar senha"}
                             >
                                 {showPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                             </button>
@@ -169,9 +160,10 @@ const CadastroForm = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-black">Confirmar a senha</label>
+                        <label htmlFor="cadastro-confirmar-senha" className="block text-sm font-semibold text-black">Confirmar a senha</label>
                         <div className="relative">
                             <input
+                                id="cadastro-confirmar-senha"
                                 type={showPwd2 ? "text" : "password"}
                                 value={confirm}
                                 onChange={(e) => setConfirm(e.target.value)}
@@ -183,7 +175,7 @@ const CadastroForm = () => {
                                 type="button"
                                 onClick={() => setShowPwd2((s) => !s)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-800 hover:text-black"
-                                aria-label="Mostrar senha"
+                                aria-label={showPwd2 ? "Ocultar senha" : "Mostrar senha"}
                             >
                                 {showPwd2 ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                             </button>

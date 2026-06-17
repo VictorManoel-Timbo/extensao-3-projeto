@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import NavBar from "@/components/navbar/Navbar";
 import Sidebar from "@/components/sideBar/SideBar";
 import ChatInput from "@/components/chatInput/ChatInput";
@@ -7,7 +7,10 @@ import EmptyChat from "@/components/emptyChat/EmptyChat";
 import { useChat } from "@/hooks/use-chat";
 
 const Index = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Sidebar fechada por padrão em telas < md (768px).
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= 768,
+  );
   const {
     chats,
     activeId,
@@ -15,19 +18,24 @@ const Index = () => {
     loading,
     error,
     isChatPending,
+    deletingId,
     handleNewChat,
     handleSelect,
     handleDelete,
     handleSend,
   } = useChat();
 
-  const conversations = chats.map((c) => ({
-    id: c.id,
-    title: c.title ?? "Nova conversa",
-  }));
+  const conversations = useMemo(
+    () =>
+      chats.map((c) => ({
+        id: c.id,
+        title: c.title ?? "Nova conversa",
+      })),
+    [chats],
+  );
 
   return (
-    <div className="flex px-[20vw] h-screen flex-col bg-slate-100 overflow-hidden">
+    <div className="flex px-4 md:px-16 lg:px-32 xl:px-[15vw] h-screen flex-col bg-slate-100 overflow-hidden">
       <NavBar variant="app" />
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 gap-8 px-6 py-8 overflow-hidden">
@@ -39,6 +47,7 @@ const Index = () => {
           activeId={activeId}
           onSelect={handleSelect}
           onDelete={handleDelete}
+          deletingId={deletingId}
         />
 
         <section className="flex flex-1 flex-col overflow-hidden">

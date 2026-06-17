@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
-import { AxiosError } from "axios";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, User as UserIcon, Database, Pencil, Eye, EyeOff, Mail } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { useAuth } from "@/hooks/use-auth";
 import { authService } from "@/services/auth.service";
 import { anamneseService } from "@/services/anamnese.service";
 import { ANAMNESE_UPDATED_EVENT } from "@/lib/events";
-import type { Anamnese, AnamneseRequest, BodyFeeling, EatingStyle } from "@/models/anamnese.model";
+import Radio from "@/components/ui/Radio";
+import { FEELING_MAP as FEELING_TO_BACKEND, FEELING_TO_FORM, PASSWORD_REGEX, extractError } from "@/lib/anamnese.constants";
+import type { Anamnese, AnamneseRequest, EatingStyle } from "@/models/anamnese.model";
 
 interface Props {
     open: boolean;
@@ -15,19 +17,61 @@ interface Props {
 
 type Section = "pessoal" | "anamnese";
 
+const FOCUSABLE_SELECTOR =
+    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 const EditProfileModal = ({ open, onClose }: Props) => {
     const [section, setSection] = useState<Section>("pessoal");
+    const dialogRef = useRef<HTMLDivElement>(null);
+
+    // Focus trap + Escape: foca o primeiro elemento ao abrir, mantém o Tab dentro
+    // do modal e fecha no Escape (MEDIUM-F10).
+    useEffect(() => {
+        if (!open) return;
+
+        const dialog = dialogRef.current;
+        const focusables = dialog?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+        focusables?.[0]?.focus();
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                onClose();
+                return;
+            }
+            if (e.key !== "Tab" || !dialog) return;
+
+            const items = dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+            if (items.length === 0) return;
+            const first = items[0];
+            const last = items[items.length - 1];
+
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
+
+        document.addEventListener("keydown", handleKeyDown);
+        return () => document.removeEventListener("keydown", handleKeyDown);
+    }, [open, onClose]);
 
     if (!open) return null;
 
-    return (
+    return createPortal(
         <div
+            role="dialog"
+            aria-modal="true"
             className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur bg-black/50 p-4 animate-fade-in"
-            onClick={onClose}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
         >
             <div
+                ref={dialogRef}
                 className="flex w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
             >
                 <aside className="flex w-56 flex-col gap-2 bg-slate-100 border-r border-zinc-500/50 p-4">
                     <button
@@ -66,7 +110,8 @@ const EditProfileModal = ({ open, onClose }: Props) => {
                     {section === "pessoal" ? <PessoalSection /> : <AnamneseSection />}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 };
 
@@ -103,8 +148,6 @@ const fieldClass = (editing: boolean) =>
 const textareaClass = (editing: boolean) =>
     `w-full resize-none rounded-md border border-border px-3 py-2 text-black focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30 ${editing ? "bg-slate-50" : "bg-slate-100 cursor-not-allowed"
     }`;
-
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 const PessoalSection = () => {
     const { user, setUser } = useAuth();
@@ -152,11 +195,7 @@ const PessoalSection = () => {
             setSuccess(true);
             setEditing(false);
         } catch (err) {
-            const detail =
-                err instanceof AxiosError && err.response?.data
-                    ? String(Object.values(err.response.data as Record<string, unknown>)[0])
-                    : "Não foi possível atualizar o perfil.";
-            setError(detail);
+            setError(extractError(err, "Não foi possível atualizar o perfil."));
         } finally {
             setSaving(false);
         }
@@ -281,61 +320,6 @@ const PessoalSection = () => {
     );
 };
 
-const Radio = ({
-    name,
-    value,
-    checked,
-    onChange,
-    label,
-    disabled,
-}: {
-    name: string;
-    value: string;
-    checked: boolean;
-    onChange: (v: string) => void;
-    label: string;
-    disabled: boolean;
-}) => (
-    <label
-        className={`flex items-center gap-2 text-black ${disabled ? "cursor-not-allowed" : "cursor-pointer"
-            }`}
-    >
-        <input
-            type="radio"
-            name={name}
-            value={value}
-            checked={checked}
-            onChange={() => onChange(value)}
-            disabled={disabled}
-            className="sr-only"
-        />
-        <span
-            className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${checked ? "border-foodguard-700" : "border-zinc-500"
-                }`}
-        >
-            {checked && <span className="h-2.5 w-2.5 rounded-full bg-foodguard-500" />}
-        </span>
-        <span className="text-sm">{label}</span>
-    </label>
-);
-
-// Mapeamento sentimento ↔ enum do backend (mesmo de cadastro/Anamnese.tsx, nos dois sentidos).
-const FEELING_TO_BACKEND: Record<string, BodyFeeling> = {
-    "muito-satisfeito": "very_satisfied",
-    satisfeito: "satisfied",
-    indiferente: "indifferent",
-    insatisfeito: "dissatisfied",
-    "muito-insatisfeito": "very_dissatisfied",
-};
-
-const FEELING_TO_FORM: Record<BodyFeeling, string> = {
-    very_satisfied: "muito-satisfeito",
-    satisfied: "satisfeito",
-    indifferent: "indiferente",
-    dissatisfied: "insatisfeito",
-    very_dissatisfied: "muito-insatisfeito",
-};
-
 const AnamneseSection = () => {
     const [editing, setEditing] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -427,11 +411,7 @@ const AnamneseSection = () => {
             // RN004: a atualização invalida os chats antigos no backend — sinaliza a UI de chat para recarregar.
             window.dispatchEvent(new Event(ANAMNESE_UPDATED_EVENT));
         } catch (err) {
-            const detail =
-                err instanceof AxiosError && err.response?.data
-                    ? String(Object.values(err.response.data as Record<string, unknown>)[0])
-                    : "Não foi possível atualizar o perfil alimentar.";
-            setError(detail);
+            setError(extractError(err, "Não foi possível atualizar o perfil alimentar."));
         } finally {
             setSaving(false);
         }
