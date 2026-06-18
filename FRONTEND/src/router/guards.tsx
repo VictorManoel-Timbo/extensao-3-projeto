@@ -1,18 +1,19 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useParams } from "react-router-dom";
 import Index from "@/pages/Index";
+import Galeria from "@/pages/Galeria";
 import Landing from "@/pages/Landing";
 import { useAuth } from "@/hooks/use-auth";
 
-// Landing pública ("/"): usuário logado vai direto ao chat; visitante vê a landing.
+// Landing pública ("/"): usuário logado vai à galeria; visitante vê a landing.
 export const LandingRoute = () => {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <Navigate to="/chat" replace /> : <Landing />;
+  return isAuthenticated ? <Navigate to="/galeria" replace /> : <Landing />;
 };
 
-// Rotas só para visitantes (RN007): usuário logado é redirecionado ao chat
+// Rotas só para visitantes (RN007): usuário logado é redirecionado à galeria
 export const GuestOnlyRoute = () => {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <Navigate to="/chat" replace /> : <Outlet />;
+  return isAuthenticated ? <Navigate to="/galeria" replace /> : <Outlet />;
 };
 
 // Rotas protegidas (RN007): exige sessão ativa
@@ -21,8 +22,20 @@ export const ProtectedRoute = () => {
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
 };
 
-// Gate de anamnese (RN001): acesso ao chat exige anamnese completa
+// Gate de anamnese (RN001): acesso à galeria exige anamnese completa
+export const GalleryRoute = () => {
+  const { hasAnamnese } = useAuth();
+  return hasAnamnese ? <Galeria /> : <Navigate to="/anamnese" replace />;
+};
+
+// Gate de anamnese (RN001): acesso ao chat exige anamnese completa.
+// `chatId` (opcional) abre uma conversa específica vinda da galeria.
 export const ChatRoute = () => {
   const { hasAnamnese } = useAuth();
-  return hasAnamnese ? <Index /> : <Navigate to="/anamnese" replace />;
+  const { chatId } = useParams();
+  return hasAnamnese ? (
+    <Index initialChatId={chatId ?? null} />
+  ) : (
+    <Navigate to="/anamnese" replace />
+  );
 };

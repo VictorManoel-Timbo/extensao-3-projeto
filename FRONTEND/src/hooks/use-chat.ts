@@ -5,8 +5,8 @@ import { useMessages } from "./use-messages";
 
 export type { Message } from "./use-messages";
 
-export const useChat = () => {
-  const chatList = useChatList();
+export const useChat = (initialChatId: string | null = null) => {
+  const chatList = useChatList(initialChatId);
   const { messages, isChatPending, handleSend, clearMessages, loading: msgLoading, error: msgError } =
     useMessages(chatList.activeId, chatList.setActiveId, chatList.addChat);
 

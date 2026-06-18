@@ -6,7 +6,12 @@ import ChatMessages from "@/components/chatMessages/ChatMessages";
 import EmptyChat from "@/components/emptyChat/EmptyChat";
 import { useChat } from "@/hooks/use-chat";
 
-const Index = () => {
+type IndexProps = {
+  /** Conversa aberta a partir da galeria (rota /chat/:chatId). */
+  initialChatId?: string | null;
+};
+
+const Index = ({ initialChatId = null }: IndexProps) => {
   // Sidebar fechada por padrão em telas < md (768px).
   const [sidebarOpen, setSidebarOpen] = useState(
     () => typeof window !== "undefined" && window.innerWidth >= 768,
@@ -23,7 +28,7 @@ const Index = () => {
     handleSelect,
     handleDelete,
     handleSend,
-  } = useChat();
+  } = useChat(initialChatId);
 
   const conversations = useMemo(
     () =>

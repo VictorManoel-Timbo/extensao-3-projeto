@@ -2,7 +2,13 @@ import { createBrowserRouter } from "react-router-dom";
 import Login from "@/pages/Login";
 import Cadastro from "@/pages/Cadastro";
 import AnamneseGate from "@/pages/AnamneseGate";
-import { ChatRoute, GuestOnlyRoute, LandingRoute, ProtectedRoute } from "@/router/guards";
+import {
+  ChatRoute,
+  GalleryRoute,
+  GuestOnlyRoute,
+  LandingRoute,
+  ProtectedRoute,
+} from "@/router/guards";
 
 const router = createBrowserRouter([
   {
@@ -20,7 +26,9 @@ const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       { path: "/anamnese", element: <AnamneseGate /> },
+      { path: "/galeria", element: <GalleryRoute /> },
       { path: "/chat", element: <ChatRoute /> },
+      { path: "/chat/:chatId", element: <ChatRoute /> },
     ],
   },
 ]);

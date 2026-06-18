@@ -167,8 +167,17 @@ user is sent to `/login`.
 - Route guards live in `src/router/guards.tsx` (kept separate so `router.tsx` only exports the route object — Fast Refresh rule):
   - `GuestOnlyRoute` — `/login`, `/cadastro`, `/esqueci-senha`; redirects authenticated users to `/chat` (RN007).
   - `ProtectedRoute` — requires an active session; otherwise redirects to `/login` (RN007).
-  - `ChatRoute` — anamnese gate (RN001): `/chat` requires a completed anamnese, else redirects to `/anamnese`.
-- Routes: `/` (Landing), `/login`, `/cadastro`, `/esqueci-senha`, `/anamnese` (`AnamneseGate`), `/chat` (`Index`).
+  - `GalleryRoute` — anamnese gate (RN001): `/galeria` requires a completed anamnese, else redirects to `/anamnese`.
+  - `ChatRoute` — anamnese gate (RN001): `/chat` and `/chat/:chatId` require a completed anamnese; `:chatId` opens that conversation in `Index` via `initialChatId`.
+- Routes: `/` (Landing), `/login`, `/cadastro`, `/esqueci-senha`, `/anamnese` (`AnamneseGate`), `/galeria` (`Galeria` — post-login home), `/chat` + `/chat/:chatId` (`Index`).
+- **Post-login landing is `/galeria`** (the chat gallery). `LandingRoute`, `GuestOnlyRoute` and `Login` all redirect authenticated users there.
+
+### Gallery (`/galeria`)
+
+- `pages/Galeria.tsx` — chat gallery grid. A "Criar nova conversa" card (→ `/chat`) plus one `ChatCard` per conversation. Filter tabs by severity (Todos / Seguros / Atenção / Perigosos).
+- `components/gallery/ChatCard.tsx` — card: product image (`chat.image_url`) or default `Utensils` icon, severity badge (`VERDICT_META`), title, date (`date-fns` ptBR), and a `...` delete menu.
+- `hooks/use-gallery.ts` — fetches chats (`chatService.listar`), holds the severity filter, exposes `filteredChats` and `handleDelete`.
+- `lib/verdict.ts` — `SEVERITY_FILTERS` (filter buckets) + `matchesSeverityFilter()` map the 5 verdict levels to the gallery tabs.
 
 ---
 
@@ -208,6 +217,9 @@ interface Chat {
   title: string | null;
   created_at: string;
   is_active: boolean;
+  is_open: boolean;
+  image_url: string | null;   // product image (OpenFoodFacts), shown on gallery card
+  severity: Verdict | null;   // most recent verdict of the chat — drives badge + filter
   messages: string;
 }
 ```

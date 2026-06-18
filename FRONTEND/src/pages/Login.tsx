@@ -21,8 +21,8 @@ const Login = () => {
         setSubmitting(true);
         try {
             await login({ email: email.trim(), password });
-            // RN001: o gate de anamnese decide entre /chat e /anamnese
-            navigate("/chat", { replace: true });
+            // RN001: o gate de anamnese decide entre /galeria e /anamnese
+            navigate("/galeria", { replace: true });
         } catch (err) {
             // Mensagem genérica por privacidade (RF003)
             if (err instanceof AxiosError && err.response?.status === 401) {

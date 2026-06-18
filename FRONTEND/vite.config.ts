@@ -13,6 +13,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      allowedHosts: ["teste.foodguard.digital"],
       proxy: {
         '/api': {
           target: process.env.VITE_BASE_URL,
