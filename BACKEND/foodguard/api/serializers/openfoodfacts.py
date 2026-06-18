@@ -12,6 +12,8 @@ class IngredientSerializer(serializers.Serializer):
 
 class OpenFoodFactsProductSerializer(serializers.Serializer):
     product_name = serializers.CharField(required=False, allow_blank=True, default="")
+    image_url = serializers.URLField(required=False, allow_blank=True, default="")
+    image_front_url = serializers.URLField(required=False, allow_blank=True, default="")
     additives_tags = serializers.ListField(child=serializers.CharField(), default=list)
     allergens_tags = serializers.ListField(child=serializers.CharField(), default=list)
     ingredients = IngredientSerializer(many=True, default=list)

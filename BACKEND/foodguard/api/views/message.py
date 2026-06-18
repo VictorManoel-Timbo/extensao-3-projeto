@@ -263,6 +263,15 @@ def _chat_title(food_data: dict | None, fallback: str) -> str:
     return fallback[:15]
 
 
+def _food_image_url(food_data: dict | None) -> str:
+    """URL da imagem do produto escaneado (OpenFoodFacts), exibida no card da
+    galeria. Prefere a imagem frontal; cai para a imagem genérica."""
+    if not food_data:
+        return ""
+    product = food_data.get('product', {})
+    return (product.get('image_front_url') or product.get('image_url') or "").strip()
+
+
 def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
     """Monta o histórico DSPy pareando mensagens U -> A em ordem cronológica.
 
@@ -343,6 +352,7 @@ class MessageCreateAPIView(CreateAPIView):
                     chat = Chat.objects.create(
                         user=request.user,
                         title=_chat_title(food_data, user_message_content),
+                        image_url=_food_image_url(food_data) or None,
                     )
                 else:
                     chat = get_object_or_404(Chat, id=chat_id, user=request.user)
@@ -400,6 +410,22 @@ class MessageCreateAPIView(CreateAPIView):
                     verdict=verdict,
                     recommends_doctor=result.get("recommends_doctor", False),
                 )
+
+                # Cache desnormalizado para a galeria: severidade = veredito mais
+                # recente; preenche a imagem do chat se ainda não houver uma e este
+                # produto trouxer imagem (ex.: produto escaneado num follow-up).
+                chat_updates = []
+                if verdict is not None:
+                    chat.severity = verdict
+                    chat_updates.append('severity')
+                if not chat.image_url:
+                    new_image = _food_image_url(food_data)
+                    if new_image:
+                        chat.image_url = new_image
+                        chat_updates.append('image_url')
+                if chat_updates:
+                    chat_updates.append('updated_at')
+                    chat.save(update_fields=chat_updates)
         except (Http404, APIException):
             raise
         except Exception as e:
