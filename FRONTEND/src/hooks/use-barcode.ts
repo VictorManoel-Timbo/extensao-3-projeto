@@ -1,6 +1,15 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { IImageArray } from "@/models/open-food.model";
 
+// A Web API BarcodeDetector ainda não está nos tipos do lib.dom.
+interface BarcodeDetectorLike {
+  detect(source: ImageBitmapSource): Promise<Array<{ rawValue: string }>>;
+}
+interface BarcodeDetectorCtor {
+  new (options?: { formats?: string[] }): BarcodeDetectorLike;
+  getSupportedFormats(): Promise<string[]>;
+}
+
 type UseBarcodeReturn = {
   decodeBarcode: (image: IImageArray) => Promise<string | null>;
   decodeBarcodeFromFile: (file: File) => Promise<string | null>;
@@ -16,14 +25,16 @@ export const useBarcode = (): UseBarcodeReturn => {
   const [isError, setIsError] = useState(false);
   const [engine, setEngine] = useState<"native" | "zxing" | null>(null);
 
-  const nativeDetectorRef = useRef<any>(null);
+  const nativeDetectorRef = useRef<BarcodeDetectorLike | null>(null);
   const zxingRef = useRef<typeof import("zxing-wasm/reader") | null>(null);
 
   useEffect(() => {
     const init = async () => {
       if ("BarcodeDetector" in window) {
         try {
-          const BarcodeDetectorAPI = (window as any).BarcodeDetector;
+          const BarcodeDetectorAPI = (
+            window as unknown as { BarcodeDetector: BarcodeDetectorCtor }
+          ).BarcodeDetector;
           const supported = await BarcodeDetectorAPI.getSupportedFormats();
           const hasEan13 = supported.includes("ean_13");
 
@@ -70,11 +81,14 @@ export const useBarcode = (): UseBarcodeReturn => {
 
   const decodeNative = useCallback(
     async (image: IImageArray): Promise<string | null> => {
+      const detector = nativeDetectorRef.current;
+      if (!detector) return null;
+
       const imageData = toImageData(image);
       const bitmap = await createImageBitmap(imageData);
 
       try {
-        const results = await nativeDetectorRef.current.detect(bitmap);
+        const results = await detector.detect(bitmap);
         if (results.length > 0) return results[0].rawValue;
         return null;
       } finally {

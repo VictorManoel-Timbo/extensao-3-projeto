@@ -19,6 +19,8 @@ export const useChatList = () => {
   }, []);
 
   useEffect(() => {
+    // Carregamento inicial da lista de conversas (data fetching no mount).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadChats();
   }, [loadChats]);
 

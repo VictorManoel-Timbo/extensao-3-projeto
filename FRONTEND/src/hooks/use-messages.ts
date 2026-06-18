@@ -13,6 +13,7 @@ export interface Message {
   imageUrl?: string;
   pending?: boolean;
   verdict?: Verdict | null;
+  recommendsDoctor?: boolean;
 }
 
 // Chave temporária de um chat ainda não persistido no backend (não deve gerar fetch).
@@ -28,6 +29,7 @@ function mapBackendMessages(messages: BackendMessage[]): Message[] {
     role: mapRole(m.role),
     text: m.content,
     verdict: m.verdict,
+    recommendsDoctor: m.recommends_doctor,
   }));
 }
 
@@ -53,6 +55,8 @@ export const useMessages = (
       return;
     fetchedChatsRef.current.add(activeId);
 
+    // Data fetching das mensagens do chat ao trocar de conversa.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     messageService
       .listar(activeId)
@@ -158,6 +162,7 @@ export const useMessages = (
             title,
             created_at: new Date().toISOString(),
             is_active: true,
+            is_open: true,
             messages: "",
           });
           // Já temos as mensagens otimistas deste chat; evita refetch (e perda da
@@ -173,7 +178,13 @@ export const useMessages = (
               ...rest,
               [resolvedChatId]: tempMessages.map((m) =>
                 m.id === pendingMsg.id
-                  ? { ...m, text: res.response, pending: false, verdict: res.verdict }
+                  ? {
+                      ...m,
+                      text: res.response,
+                      pending: false,
+                      verdict: res.verdict,
+                      recommendsDoctor: res.recommends_doctor,
+                    }
                   : m,
               ),
             };
@@ -183,7 +194,13 @@ export const useMessages = (
             ...prev,
             [resolvedChatId]: (prev[resolvedChatId] ?? []).map((m) =>
               m.id === pendingMsg.id
-                ? { ...m, text: res.response, pending: false, verdict: res.verdict }
+                ? {
+                    ...m,
+                    text: res.response,
+                    pending: false,
+                    verdict: res.verdict,
+                    recommendsDoctor: res.recommends_doctor,
+                  }
                 : m,
             ),
           }));

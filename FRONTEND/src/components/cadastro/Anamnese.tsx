@@ -63,7 +63,7 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
     <form onSubmit={handleSubmit}>
       <div className="flex items-center gap-3">
         <h2 className="font-sansita text-2xl font-extrabold tracking-tight text-black sm:text-3xl">
-          FORMULÁRIO DE PERFIL ALIMENTAR
+          FORMULÁRIO DE FORMULÁRIO DE SAÚDE
         </h2>
         <HelpCircle className="h-8 w-8 text-foodguard-600" aria-hidden="true" />
       </div>

@@ -14,6 +14,7 @@ export interface Message {
   content: string;
   created_at: string;
   verdict: Verdict | null;
+  recommends_doctor: boolean;
 }
 
 export interface MessageCreateRequest {
