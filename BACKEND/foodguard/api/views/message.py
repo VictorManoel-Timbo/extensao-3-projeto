@@ -1,12 +1,18 @@
 import logging
+import re
+import threading
 
 import dspy
 from django.conf import settings
+from django.db import connections, transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
+from rest_framework.exceptions import APIException
 from rest_framework.generics import CreateAPIView, ListAPIView
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 
 from foodguard.api.exceptions.chat import ChatClosedException
 from foodguard.api.exceptions.message import RoleNotAllowedException
@@ -14,10 +20,17 @@ from foodguard.api.serializers.message import MessageSerializer
 from foodguard.core.models.anamnese import Anamnese
 from foodguard.core.models.chat import Chat
 from foodguard.core.models.message import Message
+from foodguard.core.models.user_context import UserContext
+from foodguard.core.services.context_extractor import ContextExtractorClient
 from foodguard.core.services.gemini_client import GeminiClient
 from foodguard.core.services.openai_client import OpenAIClient
 
 logger = logging.getLogger('django')
+
+
+class AIThrottle(UserRateThrottle):
+    """Throttle dedicado aos endpoints de IA (rate definido em settings)."""
+    scope = 'ai'
 
 
 def _build_ai_client():
@@ -26,12 +39,141 @@ def _build_ai_client():
     return GeminiClient()
 
 
-ai_client = _build_ai_client()
+_ai_client = None
+
+
+def get_ai_client():
+    """Lazy singleton — evita instanciar o client (e exigir API key) no import,
+    o que quebraria commands como migrate/collectstatic."""
+    global _ai_client
+    if _ai_client is None:
+        _ai_client = _build_ai_client()
+    return _ai_client
+
+
+_context_extractor = None
+
+
+def get_context_extractor():
+    """Lazy singleton do extrator de contexto. Retorna None se não houver
+    OPENAI_API_KEY configurada (o recurso fica desligado, sem quebrar o chat)."""
+    global _context_extractor
+    if not settings.OPENAI_API_KEY:
+        return None
+    if _context_extractor is None:
+        _context_extractor = ContextExtractorClient()
+    return _context_extractor
+
+
+def _get_user_context_text(user) -> str:
+    ctx = UserContext.objects.filter(user=user).only("content").first()
+    return ctx.content.strip() if ctx and ctx.content else ""
+
+
+# Mensagem que é só o template de escaneamento (sem texto do usuário).
+_SCAN_ONLY_RE = re.compile(
+    r"^Acabei de escanear o produto:.*?O que você pode me dizer sobre ele\?\s*$",
+    re.DOTALL,
+)
+# Sufixo "[Produto escaneado: ...]" anexado quando o usuário também digitou texto.
+_SCAN_SUFFIX_RE = re.compile(r"\n\n\[Produto escaneado:.*?\]\s*$", re.DOTALL)
+
+
+def _user_text_for_context(content: str) -> str:
+    """Isola o que o usuário REALMENTE digitou, removendo o texto automático de
+    escaneamento. Evita que o nome do produto influencie a extração de contexto
+    (ex.: escanear um biscoito de chocolate não pode mexer na alergia a chocolate)."""
+    if not content:
+        return ""
+    stripped = content.strip()
+    if _SCAN_ONLY_RE.match(stripped):
+        return ""  # nada além do template de escaneamento
+    return _SCAN_SUFFIX_RE.sub("", stripped).strip()
+
+
+def _extract_and_store_context(user_id, user_message, anamnesis_text, existing_context_text):
+    """Roda em thread separada (paralela ao modelo principal): extrai fatos
+    duráveis da mensagem e os persiste no contexto do usuário.
+
+    Concorrência: usa transação + select_for_update para serializar leituras/
+    escritas concorrentes do mesmo UserContext (evita lost update). Usa conexão
+    de banco própria da thread, fechada no finally.
+    """
+    try:
+        extractor = get_context_extractor()
+        if extractor is None:
+            return
+
+        # Usa apenas o que o usuário digitou (sem o boilerplate de escaneamento).
+        clean_message = _user_text_for_context(user_message)
+        if not clean_message:
+            return
+
+        ops = extractor.analyze(clean_message, anamnesis_text, existing_context_text)
+        to_add, to_remove = ops["add"], ops["remove"]
+        if not to_add and not to_remove:
+            return
+
+        # Garante a existência da linha antes do lock (get_or_create trata a
+        # corrida de criação da OneToOne via IntegrityError internamente).
+        UserContext.objects.get_or_create(user_id=user_id)
+
+        with transaction.atomic():
+            ctx = UserContext.objects.select_for_update().get(user_id=user_id)
+            lines = [ln.strip() for ln in ctx.content.splitlines() if ln.strip()]
+
+            # Remoções (resolvidos/contraditos) — match case-insensitive.
+            remove_keys = {r.lower() for r in to_remove}
+            kept = [ln for ln in lines if ln.lower() not in remove_keys]
+
+            # Adições (sem duplicar).
+            seen = {ln.lower() for ln in kept}
+            for fact in to_add:
+                if fact.lower() not in seen:
+                    seen.add(fact.lower())
+                    kept.append(fact)
+
+            new_content = "\n".join(kept)
+            if new_content != ctx.content:
+                ctx.content = new_content
+                ctx.save(update_fields=["content", "updated_at"])
+                logger.info(
+                    "Contexto do usuário %s atualizado (+%d/-%d).",
+                    user_id, len(to_add), len(remove_keys),
+                )
+    except Exception as e:
+        logger.error("Erro ao analisar/salvar contexto do usuário: %s", str(e), exc_info=True)
+    finally:
+        # Fecha a conexão de banco aberta nesta thread.
+        connections.close_all()
+
+
+_VERDICT_CODES_RE = re.compile(
+    r"\b(?:SAFE|LOW_CONCERN|MODERATE_RISK|HIGH_RISK|INSUFFICIENT_DATA)\b"
+)
+
+
+def _strip_verdict_codes(text: str) -> str:
+    """Remove qualquer código de veredito que o modelo tenha vazado no texto —
+    o veredito vai à parte no campo `verdict`, não na resposta ao usuário."""
+    if not text:
+        return text
+    cleaned = _VERDICT_CODES_RE.sub("", text)
+    cleaned = re.sub(r"\(\s*\)|\[\s*\]", "", cleaned)  # parênteses/colchetes vazios
+    # Remove rótulos órfãos deixados pela remoção do código (ex.: "Veredito: .")
+    cleaned = re.sub(
+        r"(?i)\b(veredito|classifica[çc][ãa]o|classificado como)\s*[:\-]?\s*(?=[.,;]|$)",
+        "",
+        cleaned,
+    )
+    cleaned = re.sub(r"\s+([,.;:!?])", r"\1", cleaned)  # espaço antes de pontuação
+    cleaned = re.sub(r"([,;:]\s*){2,}", lambda m: m.group(0)[-2:], cleaned)  # pontuação repetida
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"^[\s,.;:]+", "", cleaned)  # pontuação/espaço no início
+    return cleaned.strip()
 
 
 def _format_anamnesis(anamnese: Anamnese) -> str:
-    # Per RQ002: Name, Email, and Date of Birth are intentionally excluded
-    # before sending health data to the LLM.
     lines = [
         f"Estilo alimentar: {anamnese.get_eating_style_display()}",
         f"Sentimento sobre o corpo e alimentação: {anamnese.get_body_feeling_display() or 'Não informado'}",
@@ -54,12 +196,36 @@ def _format_anamnesis(anamnese: Anamnese) -> str:
     return "\n".join(lines)
 
 
+_NUTRIMENT_FIELDS = [
+    ("energy-kcal_100g", "Energia", "kcal"),
+    ("carbohydrates_100g", "Carboidratos", "g"),
+    ("sugars_100g", "Açúcares", "g"),
+    ("fat_100g", "Gorduras totais", "g"),
+    ("saturated-fat_100g", "Gorduras saturadas", "g"),
+    ("fiber_100g", "Fibras", "g"),
+    ("proteins_100g", "Proteínas", "g"),
+    ("salt_100g", "Sal", "g"),
+    ("sodium_100g", "Sódio", "g"),
+]
+
+
+def _format_nutriments(nutriments: dict | None) -> str:
+    if not nutriments:
+        return ""
+    parts = [
+        f"{label}: {nutriments[key]}{unit}"
+        for key, label, unit in _NUTRIMENT_FIELDS
+        if nutriments.get(key) is not None
+    ]
+    return "; ".join(parts)
+
+
 def _format_food_data(food_data: dict | None) -> str:
     if not food_data:
         return "Nenhum produto específico fornecido. Análise baseada apenas na query do usuário."
 
     product = food_data.get('product', {})
-    product_name = product.get('product_name', 'Nome não disponível')
+    product_name = product.get('product_name') or 'Nome não disponível'
 
     ingredients = product.get('ingredients', [])
     ingredient_list = ", ".join(
@@ -67,16 +233,34 @@ def _format_food_data(food_data: dict | None) -> str:
         for ing in ingredients
         if ing.get('text')
     )
+    if not ingredient_list:
+        ingredient_list = (product.get('ingredients_text') or "").strip()
 
     allergens = ", ".join(product.get('allergens_tags', [])) or "Nenhum declarado"
     additives = ", ".join(product.get('additives_tags', [])) or "Nenhum"
 
-    return "\n".join([
+    lines = [
         f"Produto: {product_name}",
         f"Ingredientes: {ingredient_list or 'Não disponível'}",
         f"Alérgenos declarados: {allergens}",
         f"Aditivos: {additives}",
-    ])
+    ]
+
+    nutriments = _format_nutriments(product.get('nutriments'))
+    if nutriments:
+        lines.append(f"Informação nutricional (por 100g): {nutriments}")
+
+    return "\n".join(lines)
+
+
+def _chat_title(food_data: dict | None, fallback: str) -> str:
+    """Título do chat: nome do produto escaneado quando disponível, senão o
+    início da mensagem do usuário."""
+    if food_data:
+        name = (food_data.get('product', {}).get('product_name') or "").strip()
+        if name:
+            return name[:255]
+    return fallback[:15]
 
 
 def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
@@ -94,6 +278,12 @@ def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
     pending_user = None
     for message in messages:
         if message.role == Message.Role.USER:
+            if pending_user is not None:
+                logger.warning(
+                    "Mensagem de usuário sem resposta da IA no chat %s; "
+                    "incluindo turno com answer vazia.", chat.id,
+                )
+                turns.append({"user_query": pending_user, "answer": ""})
             pending_user = message.content
         elif message.role == Message.Role.ASSISTANT and pending_user is not None:
             turns.append({"user_query": pending_user, "answer": message.content})
@@ -118,7 +308,11 @@ def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
                 "chat_id": serializers.UUIDField(),
                 "response": serializers.CharField(),
                 "verdict": serializers.ChoiceField(
-                    choices=["SAFE", "DANGEROUS"], allow_null=True
+                    choices=[
+                        "SAFE", "LOW_CONCERN", "MODERATE_RISK",
+                        "HIGH_RISK", "INSUFFICIENT_DATA",
+                    ],
+                    allow_null=True,
                 ),
                 "recommends_doctor": serializers.BooleanField(),
             },
@@ -127,6 +321,7 @@ def _build_history(chat: Chat, exclude_message_id) -> dspy.History:
 )
 class MessageCreateAPIView(CreateAPIView):
     serializer_class = MessageSerializer
+    throttle_classes = [AIThrottle]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -136,53 +331,77 @@ class MessageCreateAPIView(CreateAPIView):
         if role == Message.Role.ASSISTANT:
             raise RoleNotAllowedException()
 
-        chat_id = request.data.get('chat_id')
+        chat_id = serializer.validated_data.get('chat_id')
         user_message_content = serializer.validated_data.get('content', '')
 
-        if not chat_id:
-            chat = Chat.objects.create(user=request.user, title=user_message_content[:15])
-        else:
-            chat = get_object_or_404(Chat, id=chat_id)
-
-        if not chat.is_active:
-            raise ChatClosedException()
-
-        # food_data must be captured before serializer.save(), which pops it from validated_data
+        ai_client = get_ai_client()
         food_data = serializer.validated_data.get('food_data')
 
-        # A conversa de acompanhamento só é possível quando já existe uma resposta do
-        # assistente neste chat e o client de IA suporta o modo conversacional.
-        has_prior_assistant = Message.objects.filter(
-            chat=chat, role=Message.Role.ASSISTANT
-        ).exists()
-        supports_conversation = hasattr(ai_client, "continue_conversation")
-        is_follow_up = (
-            not food_data and has_prior_assistant and supports_conversation
-        )
-
-        user_message = serializer.save(chat=chat)
-
-        anamnese = Anamnese.objects.filter(user=request.user).first()
-        user_anamnesis = _format_anamnesis(anamnese) if anamnese else "Anamnese não disponível."
-
         try:
-            if is_follow_up:
-                result = ai_client.continue_conversation(
-                    user_anamnesis=user_anamnesis,
-                    food_context=_format_food_data(food_data),
-                    history=_build_history(chat, exclude_message_id=user_message.id),
-                    user_query=user_message.content,
+            with transaction.atomic():
+                if not chat_id:
+                    chat = Chat.objects.create(
+                        user=request.user,
+                        title=_chat_title(food_data, user_message_content),
+                    )
+                else:
+                    chat = get_object_or_404(Chat, id=chat_id, user=request.user)
+
+                if not chat.is_open:
+                    raise ChatClosedException()
+
+                has_prior_assistant = Message.objects.filter(
+                    chat=chat, role=Message.Role.ASSISTANT
+                ).exists()
+                supports_conversation = hasattr(ai_client, "continue_conversation")
+                is_follow_up = (
+                    not food_data and has_prior_assistant and supports_conversation
                 )
-                ai_content = result["response"]
-                verdict = None
-            else:
-                result = ai_client.assess_safety(
-                    user_anamnesis=user_anamnesis,
-                    food_ingredients=_format_food_data(food_data),
-                    user_query=user_message.content,
+
+                user_message = serializer.save(chat=chat)
+
+                anamnese = Anamnese.objects.filter(user=request.user).first()
+                anamnesis_text = (
+                    _format_anamnesis(anamnese) if anamnese else "Anamnese não disponível."
                 )
-                ai_content = result["explanation"]
-                verdict = result["verdict"]
+                # Contexto acumulado de conversas anteriores (fatos fora da anamnese).
+                existing_context_text = _get_user_context_text(request.user)
+                user_anamnesis = anamnesis_text
+                if existing_context_text:
+                    user_anamnesis += (
+                        "\n\nInformações adicionais que o usuário mencionou em "
+                        "conversas anteriores:\n" + existing_context_text
+                    )
+
+                if is_follow_up:
+                    result = ai_client.continue_conversation(
+                        user_anamnesis=user_anamnesis,
+                        food_context=_format_food_data(food_data),
+                        history=_build_history(chat, exclude_message_id=user_message.id),
+                        user_query=user_message.content,
+                    )
+                    ai_content = result["response"]
+                    verdict = None
+                else:
+                    result = ai_client.assess_safety(
+                        user_anamnesis=user_anamnesis,
+                        food_ingredients=_format_food_data(food_data),
+                        user_query=user_message.content,
+                    )
+                    ai_content = result["explanation"]
+                    verdict = result["verdict"]
+
+                ai_content = _strip_verdict_codes(ai_content)
+
+                ai_message = Message.objects.create(
+                    chat=chat,
+                    role=Message.Role.ASSISTANT,
+                    content=ai_content,
+                    verdict=verdict,
+                    recommends_doctor=result.get("recommends_doctor", False),
+                )
+        except (Http404, APIException):
+            raise
         except Exception as e:
             logger.error("Erro no pipeline de IA: %s", str(e), exc_info=True)
             return Response(
@@ -190,11 +409,19 @@ class MessageCreateAPIView(CreateAPIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        ai_message = Message.objects.create(
-            chat=chat,
-            role=Message.Role.ASSISTANT,
-            content=ai_content,
-        )
+        # Extração de contexto do usuário em paralelo (fire-and-forget): não
+        # bloqueia a resposta. Usa valores já capturados (strings/ids), sem
+        # compartilhar objetos do ORM nem a transação entre threads.
+        threading.Thread(
+            target=_extract_and_store_context,
+            args=(
+                request.user.id,
+                user_message_content,
+                anamnesis_text,
+                existing_context_text,
+            ),
+            daemon=True,
+        ).start()
 
         return Response(
             {
@@ -213,4 +440,7 @@ class MessageListAPIView(ListAPIView):
 
     def get_queryset(self):
         chat_id = self.kwargs['chat_id']
-        return Message.objects.filter(chat_id=chat_id).order_by('created_at')
+        return (
+            Message.objects.filter(chat_id=chat_id, chat__user=self.request.user)
+            .order_by('created_at')
+        )

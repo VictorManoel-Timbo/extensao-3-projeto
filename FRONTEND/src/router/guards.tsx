@@ -1,6 +1,13 @@
 import { Navigate, Outlet } from "react-router-dom";
 import Index from "@/pages/Index";
+import Landing from "@/pages/Landing";
 import { useAuth } from "@/hooks/use-auth";
+
+// Landing pública ("/"): usuário logado vai direto ao chat; visitante vê a landing.
+export const LandingRoute = () => {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? <Navigate to="/chat" replace /> : <Landing />;
+};
 
 // Rotas só para visitantes (RN007): usuário logado é redirecionado ao chat
 export const GuestOnlyRoute = () => {

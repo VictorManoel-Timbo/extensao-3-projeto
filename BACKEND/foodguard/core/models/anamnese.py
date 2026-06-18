@@ -3,7 +3,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 
 from foodguard.core.models.base import BaseModel
-from foodguard.core.models.chat import Chat
 
 
 class Anamnese(BaseModel):
@@ -97,6 +96,10 @@ class Anamnese(BaseModel):
         default='not',
         verbose_name="Estilo de alimentação"
     )
+
+    class Meta:
+        verbose_name = "Anamnese"
+        verbose_name_plural = "Anamneses"
 
     def clean(self):
         if self.previous_consultation:

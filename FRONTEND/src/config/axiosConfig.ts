@@ -5,11 +5,16 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios";
 import { tokenStorage } from "./tokenStorage";
+import { AUTH_LOGOUT_EVENT } from "@/lib/events";
 import type { TokenPair } from "@/models/auth.model";
 
 const REFRESH_URL = "/auth/token/refresh/";
 // Endpoints que nunca devem receber Authorization nem disparar refresh
 const AUTH_PUBLIC_PATHS = ["/auth/login/", "/auth/register/", REFRESH_URL];
+// Timeout do request de refresh para não bloquear refreshPromise indefinidamente
+const REFRESH_TIMEOUT_MS = 10_000;
+
+const APP_API_BASE_URL = "/api";
 
 function apiConfig(baseUrl: string): AxiosRequestConfig {
   return {
@@ -31,7 +36,11 @@ async function refreshAccessToken(baseURL: string): Promise<string> {
   if (!refresh) return Promise.reject(new Error("Sem refresh token"));
 
   refreshPromise = axios
-    .post<TokenPair>(`${baseURL}${REFRESH_URL}`, { refresh }, { withCredentials: true })
+    .post<TokenPair>(
+      `${baseURL}${REFRESH_URL}`,
+      { refresh },
+      { withCredentials: true, timeout: REFRESH_TIMEOUT_MS },
+    )
     .then((res) => {
       const { access, refresh: newRefresh } = res.data;
       tokenStorage.setTokens(access, newRefresh ?? refresh);
@@ -46,14 +55,19 @@ async function refreshAccessToken(baseURL: string): Promise<string> {
 
 function handleAuthFailure(): void {
   tokenStorage.clear();
-  if (window.location.pathname !== "/login") {
-    window.location.assign("/login");
-  }
+  window.dispatchEvent(new Event(AUTH_LOGOUT_EVENT));
 }
 
 function initAxios(config: AxiosRequestConfig): AxiosInstance {
   const instance = axios.create(config);
-  const baseURL = (config.baseURL as string) ?? "/api";
+  const baseURL = (config.baseURL as string) ?? APP_API_BASE_URL;
+
+  // Instâncias de APIs externas (ex.: OpenFoodFacts) não recebem o JWT do
+  // FoodGuard nem o fluxo de refresh/logout — enviar o Authorization para o
+  // OpenFoodFacts resultava em 403.
+  if (baseURL !== APP_API_BASE_URL) {
+    return instance;
+  }
 
   instance.interceptors.request.use(
     (request) => {
@@ -97,8 +111,15 @@ function initAxios(config: AxiosRequestConfig): AxiosInstance {
   return instance;
 }
 
-function api(baseURL = "/api") {
-  return initAxios(apiConfig(baseURL));
+const instanceCache = new Map<string, AxiosInstance>();
+
+function api(baseURL = "/api"): AxiosInstance {
+  let instance = instanceCache.get(baseURL);
+  if (!instance) {
+    instance = initAxios(apiConfig(baseURL));
+    instanceCache.set(baseURL, instance);
+  }
+  return instance;
 }
 
 export default api;

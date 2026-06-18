@@ -1,16 +1,20 @@
+import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router-dom";
 import router from "@/router/router";
 import { AuthProvider } from "@/context/AuthContext";
 
-const queryClient = new QueryClient()
+const App = () => {
+  // QueryClient por instância de App (evita estado compartilhado entre testes).
+  const [queryClient] = useState(() => new QueryClient());
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <RouterProvider router={router}/>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App

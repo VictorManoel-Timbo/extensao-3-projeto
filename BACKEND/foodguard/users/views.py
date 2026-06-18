@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.generics import CreateAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -16,20 +17,28 @@ from foodguard.users.serializers import (
 )
 
 
+class AuthThrottle(AnonRateThrottle):
+    """Throttle para endpoints de autenticação (rate definido em settings)."""
+    scope = 'auth'
+
+
 @extend_schema(summary="Cadastro de novo usuário (RF001)")
 class RegisterView(CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [AuthThrottle]
 
 
 @extend_schema(summary="Login por email, retorna access/refresh + has_anamnese (RF003)")
 class EmailTokenObtainPairView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [AuthThrottle]
 
 
 @extend_schema(summary="Recupera ou atualiza o perfil do usuário autenticado (RF014/RF015)")
 class MeView(RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
     http_method_names = ['get', 'patch', 'options']
 
     def get_object(self):

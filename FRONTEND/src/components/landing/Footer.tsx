@@ -1,3 +1,5 @@
+const CURRENT_YEAR = new Date().getFullYear();
+
 export function Footer() {
   return (
     <footer className="border-t border-zinc-200 bg-slate-100">
@@ -6,7 +8,7 @@ export function Footer() {
           FoodGuard
         </p>
         <p className="text-xs text-zinc-500">
-          © {new Date().getFullYear()} FoodGuard. Todos os direitos reservados.
+          © {CURRENT_YEAR} FoodGuard. Todos os direitos reservados.
         </p>
       </div>
     </footer>

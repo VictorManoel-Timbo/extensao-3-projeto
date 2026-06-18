@@ -84,17 +84,11 @@ const Login = () => {
                             type="button"
                             onClick={() => setShowPassword((s) => !s)}
                             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-800 hover:text-black"
-                            aria-label="Mostrar senha"
+                            aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                         >
                             {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                         </button>
                     </div>
-                    <Link
-                        to="/esqueci-senha"
-                        className="inline-block pt-1 font-semibold text-foodguard-500 hover:underline"
-                    >
-                        Esqueci minha senha
-                    </Link>
                 </div>
 
                 <div>
