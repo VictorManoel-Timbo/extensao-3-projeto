@@ -163,6 +163,11 @@ export const useMessages = (
             created_at: new Date().toISOString(),
             is_active: true,
             is_open: true,
+            image_url:
+              product?.product.image_front_url ||
+              product?.product.image_url ||
+              null,
+            severity: res.verdict,
             messages: "",
           });
           // Já temos as mensagens otimistas deste chat; evita refetch (e perda da

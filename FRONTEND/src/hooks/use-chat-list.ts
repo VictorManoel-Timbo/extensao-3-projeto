@@ -3,9 +3,9 @@ import type { Chat } from "@/models/chat.model";
 import { chatService } from "@/services/chat.service";
 import { ANAMNESE_UPDATED_EVENT } from "@/lib/events";
 
-export const useChatList = () => {
+export const useChatList = (initialActiveId: string | null = null) => {
   const [chats, setChats] = useState<Chat[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(initialActiveId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

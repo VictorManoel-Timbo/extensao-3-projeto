@@ -29,3 +29,35 @@ export const VERDICT_META: Record<Verdict, VerdictMeta> = {
     className: "bg-slate-100 text-slate-700 border-slate-300",
   },
 };
+
+/** Buckets do filtro de severidade da galeria. */
+export type SeverityFilter = "ALL" | "SAFE" | "ATTENTION" | "DANGER";
+
+type SeverityFilterMeta = {
+  value: SeverityFilter;
+  label: string;
+  /** Vereditos que pertencem a este bucket (vazio em "ALL"). */
+  verdicts: Verdict[];
+};
+
+/** Definição (e ordem) das abas de filtro exibidas na galeria. */
+export const SEVERITY_FILTERS: SeverityFilterMeta[] = [
+  { value: "ALL", label: "Todos", verdicts: [] },
+  { value: "SAFE", label: "Seguros", verdicts: ["SAFE"] },
+  { value: "ATTENTION", label: "Atenção", verdicts: ["LOW_CONCERN"] },
+  { value: "DANGER", label: "Perigosos", verdicts: ["MODERATE_RISK", "HIGH_RISK"] },
+];
+
+/**
+ * Indica se um chat (pela sua severidade) pertence ao filtro selecionado.
+ * "ALL" inclui tudo (inclusive INSUFFICIENT_DATA e chats sem avaliação).
+ */
+export const matchesSeverityFilter = (
+  severity: Verdict | null | undefined,
+  filter: SeverityFilter,
+): boolean => {
+  if (filter === "ALL") return true;
+  if (!severity) return false;
+  const meta = SEVERITY_FILTERS.find((f) => f.value === filter);
+  return meta ? meta.verdicts.includes(severity) : false;
+};
