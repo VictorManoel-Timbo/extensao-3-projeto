@@ -4,26 +4,50 @@ import dspy
 from pydantic import BaseModel, Field
 
 
-class ExtractUserContext(dspy.Signature):
+class UpdateUserContext(dspy.Signature):
     """
-    Você extrai, da mensagem do usuário, informações pessoais DURÁVEIS e
-    relevantes para segurança alimentar que ele revele sobre si mesmo e que
-    AINDA NÃO constem na anamnese nem no contexto já registrado.
+    Mantenha atualizada a "memória" de fatos do usuário relevantes para segurança
+    alimentar, a partir da mensagem atual e do contexto já registrado. Você decide
+    o que ADICIONAR e o que REMOVER. Na dúvida, retorne listas vazias.
 
-    Extraia apenas fatos estáveis e úteis para futuras análises, como:
-    alergias, intolerâncias, doenças/condições de saúde, medicamentos de uso
-    contínuo, restrições/preferências alimentares persistentes.
+    ADICIONAR (facts_to_add) — fatos relevantes que o usuário AFIRME
+    EXPLICITAMENTE sobre si, em 1ª pessoa, e que ainda NÃO estejam no contexto:
+    - alergias, intolerâncias, doenças/condições, medicamentos de uso contínuo,
+      restrições alimentares (vegano, celíaco, etc.);
+    - REAÇÕES/SINTOMAS a alimentos específicos que o usuário relate (ex.: "senti
+      desconforto ao comer chocolate" → "Sentiu desconforto ao comer chocolate").
+      Registre vinculado ao alimento, sem generalizar.
 
-    NÃO extraia: perguntas, dúvidas, sintomas pontuais do momento, opiniões
-    passageiras, ou qualquer coisa já presente na anamnese/contexto.
+    REMOVER (facts_to_remove) — fatos que JÁ ESTÃO no contexto e que a mensagem
+    indica estarem RESOLVIDOS, desatualizados ou CONTRADITOS (ex.: o usuário diz
+    que o médico liberou o alimento, que não tem mais a alergia, ou que o sintoma
+    cessou). Copie a linha EXATA do contexto existente que deve sair.
 
-    Regras:
-    - Cada fato deve ser uma frase curta, objetiva, em português (ex.:
-      "Tem alergia a leite", "É diabético").
-    - Se a mensagem não trouxer nenhuma informação nova e durável, retorne uma
-      lista vazia.
-    - Não duplique informação já existente na anamnese ou no contexto.
-    - Não invente: extraia apenas o que o usuário afirmou explicitamente.
+    NUNCA faça:
+    - INFERÊNCIA a partir do nome de um produto escaneado/citado. Ex.: alergia a
+      "chocolate" NÃO vira alergia a "biscoito" só porque o produto é um biscoito.
+    - Tratar o texto automático "Acabei de escanear o produto: ..." como afirmação
+      do usuário sobre si mesmo.
+    - REMOVER um fato por causa de menção/escaneamento de um produto que contenha
+      aquele alérgeno. Escanear um chocolate NÃO significa que a alergia a
+      chocolate acabou. Só remova com declaração explícita de resolução (ex.:
+      "o médico liberou", "não tenho mais essa alergia", "o sintoma passou").
+    - Adicionar perguntas, dúvidas ou opiniões passageiras.
+    - Remover algo sem indicação clara de resolução/contradição na mensagem.
+
+    Forma: português, frases curtas e objetivas.
+
+    Exemplos:
+    - Contexto: "Tem alergia a leite" | Mensagem: "sou alérgico a chocolate"
+      → add: ["Tem alergia a chocolate"], remove: []
+    - Contexto: "Tem alergia a chocolate" | Mensagem: "fui ao médico e ele disse
+      que posso comer chocolate normalmente"
+      → add: [], remove: ["Tem alergia a chocolate"]
+    - Mensagem: "senti um desconforto na barriga depois de comer chocolate"
+      → add: ["Sentiu desconforto ao comer chocolate"], remove: []
+    - Mensagem: "Acabei de escanear o produto: Biscoito Cookie Chocolate..."
+      → add: [], remove: []
+    - Mensagem: "queria saber se posso comer isso" → add: [], remove: []
     """
 
     user_message: str = dspy.InputField(desc="Mensagem enviada pelo usuário.")
@@ -31,12 +55,15 @@ class ExtractUserContext(dspy.Signature):
         desc="Anamnese já cadastrada do usuário (não repetir o que já está aqui)."
     )
     existing_context: str = dspy.InputField(
-        desc="Fatos já registrados no contexto do usuário (não repetir)."
+        desc="Fatos já registrados no contexto do usuário (uma linha por fato)."
     )
-    new_facts: list[str] = dspy.OutputField(
+    facts_to_add: list[str] = dspy.OutputField(
+        desc="Fatos novos a adicionar ao contexto. Vazio se não houver."
+    )
+    facts_to_remove: list[str] = dspy.OutputField(
         desc=(
-            "Lista de fatos novos e duráveis extraídos da mensagem que não estão "
-            "na anamnese nem no contexto. Lista vazia se não houver nenhum."
+            "Linhas EXATAS do contexto existente a remover (resolvidas/contraditas). "
+            "Vazio se não houver."
         )
     )
 

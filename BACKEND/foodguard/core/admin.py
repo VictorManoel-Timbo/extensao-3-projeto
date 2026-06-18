@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from foodguard.core.models import Anamnese, Chat, Message
+from foodguard.core.models import Anamnese, Chat, Message, UserContext
 
 # O registro do User fica em foodguard/users/admin.py (convenção Django).
 
@@ -21,3 +21,10 @@ class MessageAdmin(admin.ModelAdmin):
     list_display = ('chat', 'role', 'created_at')
     search_fields = ['chat__user__email', 'chat__user__name']
     list_filter = ('created_at',)
+
+@admin.register(UserContext)
+class UserContextAdmin(admin.ModelAdmin):
+    list_display = ('user', 'updated_at')
+    search_fields = ('user__email', 'user__name')
+    list_filter = ('updated_at',)
+    readonly_fields = ('created_at', 'updated_at')

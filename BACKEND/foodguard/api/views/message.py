@@ -70,6 +70,27 @@ def _get_user_context_text(user) -> str:
     return ctx.content.strip() if ctx and ctx.content else ""
 
 
+# Mensagem que é só o template de escaneamento (sem texto do usuário).
+_SCAN_ONLY_RE = re.compile(
+    r"^Acabei de escanear o produto:.*?O que você pode me dizer sobre ele\?\s*$",
+    re.DOTALL,
+)
+# Sufixo "[Produto escaneado: ...]" anexado quando o usuário também digitou texto.
+_SCAN_SUFFIX_RE = re.compile(r"\n\n\[Produto escaneado:.*?\]\s*$", re.DOTALL)
+
+
+def _user_text_for_context(content: str) -> str:
+    """Isola o que o usuário REALMENTE digitou, removendo o texto automático de
+    escaneamento. Evita que o nome do produto influencie a extração de contexto
+    (ex.: escanear um biscoito de chocolate não pode mexer na alergia a chocolate)."""
+    if not content:
+        return ""
+    stripped = content.strip()
+    if _SCAN_ONLY_RE.match(stripped):
+        return ""  # nada além do template de escaneamento
+    return _SCAN_SUFFIX_RE.sub("", stripped).strip()
+
+
 def _extract_and_store_context(user_id, user_message, anamnesis_text, existing_context_text):
     """Roda em thread separada (paralela ao modelo principal): extrai fatos
     duráveis da mensagem e os persiste no contexto do usuário.
@@ -83,8 +104,14 @@ def _extract_and_store_context(user_id, user_message, anamnesis_text, existing_c
         if extractor is None:
             return
 
-        facts = extractor.extract(user_message, anamnesis_text, existing_context_text)
-        if not facts:
+        # Usa apenas o que o usuário digitou (sem o boilerplate de escaneamento).
+        clean_message = _user_text_for_context(user_message)
+        if not clean_message:
+            return
+
+        ops = extractor.analyze(clean_message, anamnesis_text, existing_context_text)
+        to_add, to_remove = ops["add"], ops["remove"]
+        if not to_add and not to_remove:
             return
 
         # Garante a existência da linha antes do lock (get_or_create trata a
@@ -93,22 +120,29 @@ def _extract_and_store_context(user_id, user_message, anamnesis_text, existing_c
 
         with transaction.atomic():
             ctx = UserContext.objects.select_for_update().get(user_id=user_id)
-            existing_lines = [ln.strip() for ln in ctx.content.splitlines() if ln.strip()]
-            seen = {ln.lower() for ln in existing_lines}
+            lines = [ln.strip() for ln in ctx.content.splitlines() if ln.strip()]
 
-            added = []
-            for fact in facts:
-                key = fact.lower()
-                if key not in seen:
-                    seen.add(key)
-                    added.append(fact)
+            # Remoções (resolvidos/contraditos) — match case-insensitive.
+            remove_keys = {r.lower() for r in to_remove}
+            kept = [ln for ln in lines if ln.lower() not in remove_keys]
 
-            if added:
-                ctx.content = "\n".join(existing_lines + added)
+            # Adições (sem duplicar).
+            seen = {ln.lower() for ln in kept}
+            for fact in to_add:
+                if fact.lower() not in seen:
+                    seen.add(fact.lower())
+                    kept.append(fact)
+
+            new_content = "\n".join(kept)
+            if new_content != ctx.content:
+                ctx.content = new_content
                 ctx.save(update_fields=["content", "updated_at"])
-                logger.info("Contexto do usuário %s atualizado: +%d fato(s).", user_id, len(added))
+                logger.info(
+                    "Contexto do usuário %s atualizado (+%d/-%d).",
+                    user_id, len(to_add), len(remove_keys),
+                )
     except Exception as e:
-        logger.error("Erro ao extrair/salvar contexto do usuário: %s", str(e), exc_info=True)
+        logger.error("Erro ao analisar/salvar contexto do usuário: %s", str(e), exc_info=True)
     finally:
         # Fecha a conexão de banco aberta nesta thread.
         connections.close_all()
@@ -313,7 +347,7 @@ class MessageCreateAPIView(CreateAPIView):
                 else:
                     chat = get_object_or_404(Chat, id=chat_id, user=request.user)
 
-                if not chat.is_active:
+                if not chat.is_open:
                     raise ChatClosedException()
 
                 has_prior_assistant = Message.objects.filter(
@@ -364,6 +398,7 @@ class MessageCreateAPIView(CreateAPIView):
                     role=Message.Role.ASSISTANT,
                     content=ai_content,
                     verdict=verdict,
+                    recommends_doctor=result.get("recommends_doctor", False),
                 )
         except (Http404, APIException):
             raise

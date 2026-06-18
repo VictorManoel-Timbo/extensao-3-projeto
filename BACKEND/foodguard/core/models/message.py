@@ -39,6 +39,9 @@ class Message(BaseModel):
         blank=True,
         null=True,
     )
+    # True quando a IA recomenda procurar um médico/nutricionista (mensagens do
+    # assistente). Exibido como tag no chat.
+    recommends_doctor = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Mensagem"

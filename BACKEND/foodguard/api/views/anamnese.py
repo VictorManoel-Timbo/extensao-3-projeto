@@ -31,8 +31,10 @@ class AnamneseGetUpdateView(RetrieveUpdateAPIView):
     def perform_update(self, serializer):
         with transaction.atomic():
             serializer.save()
+            # RN004: fecha (somente leitura) os chats anteriores à atualização.
+            # Eles continuam visíveis no histórico — apenas não recebem mensagens.
             Chat.objects.filter(
                 user=self.request.user,
                 created_at__lte=serializer.instance.updated_at,
-            ).update(is_active=False)
+            ).update(is_open=False)
 

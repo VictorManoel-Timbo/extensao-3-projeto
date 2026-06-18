@@ -10,6 +10,9 @@ class ChatListAPIView(ListAPIView):
     serializer_class = ChatSerializer
 
     def get_queryset(self):
+        # Mostra todos os chats não-deletados (is_active=True), abertos e
+        # fechados. Os fechados (is_open=False) aparecem no histórico em modo
+        # somente leitura.
         return (
             Chat.objects.filter(user=self.request.user, is_active=True)
             .order_by('-created_at')
