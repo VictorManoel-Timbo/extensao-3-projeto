@@ -2,7 +2,7 @@
 
 > Plataforma web que analisa rótulos de produtos alimentícios e avisa se eles são **seguros** para o seu perfil de saúde.
 
-O **FoodGuard** cruza os ingredientes de um produto — obtidos por **leitura de código de barras** ou por **descrição em texto** — com a **anamnese** (histórico de saúde, alergias, intolerâncias e estilo alimentar) de cada usuário. A análise é feita por um assistente de IA (Google Gemini), que devolve um veredito de segurança com explicação técnica e o devido aviso médico.
+O **FoodGuard** cruza os ingredientes de um produto — obtidos por **leitura de código de barras** ou por **descrição em texto** — com a **anamnese** (histórico de saúde, alergias, intolerâncias e estilo alimentar) de cada usuário. A análise é feita por um assistente de IA (OpenAI GPT), que devolve um veredito de segurança com explicação técnica e o devido aviso médico.
 
 Projeto desenvolvido na disciplina **Extensão III** — Curso de Ciência da Computação, Universidade Estadual do Ceará (UECE).
 
@@ -25,7 +25,7 @@ Monorepo com dois aplicativos independentes:
 
 ```
 extensao-3-projeto/
-├── BACKEND/      → API REST (Django + DRF + PostgreSQL + Gemini)
+├── BACKEND/      → API REST (Django + DRF + PostgreSQL + OpenAI)
 ├── FRONTEND/     → SPA (React + TypeScript + Vite)
 ├── dataset/      → dados de apoio
 └── documents/    → documentação do projeto
@@ -33,7 +33,7 @@ extensao-3-projeto/
 
 ```
 ┌─────────────┐   HTTP/JWT    ┌──────────────┐   prompt+anamnese   ┌──────────────┐
-│   Frontend  │ ────────────▶ │   Backend    │ ──────────────────▶ │ Google Gemini│
+│   Frontend  │ ────────────▶ │   Backend    │ ──────────────────▶ │ OpenAI GPT-4o│
 │ React (SPA) │               │ Django REST  │                     │   (LLM)      │
 └──────┬──────┘               └──────┬───────┘                     └──────────────┘
        │ barcode → ingredientes      │
@@ -51,7 +51,7 @@ extensao-3-projeto/
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | **Frontend** | React 19 · TypeScript 5.9 · Vite 8 · Tailwind CSS 3 · shadcn/ui + Radix · TanStack Query · Axios · React Router 7 · zxing-wasm |
 | **Backend**  | Python 3.12 · Django 4.2 · Django REST Framework · PostgreSQL 16 · SimpleJWT · drf-spectacular (Swagger)                       |
-| **IA**       | Google Gemini (`gemini-2.5-flash`)                                                                                             |
+| **IA**       | OpenAI (`gpt-4o`)                                                                                                              |
 | **Infra**    | Docker + Docker Compose · VS Code Dev Containers                                                                               |
 
 > Detalhes de organização interna: [`FRONTEND/frontend_architecture.md`](FRONTEND/frontend_architecture.md) e [`BACKEND/backend_architecture.md`](BACKEND/backend_architecture.md).
@@ -65,7 +65,7 @@ extensao-3-projeto/
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (com WSL2 no Windows)
 - [Node.js](https://nodejs.org/) 20+ e npm
 - Git
-- Uma **chave da API do Google Gemini** ([obtenha aqui](https://aistudio.google.com/app/apikey))
+- Uma **chave da API da OpenAI** ([obtenha aqui](https://platform.openai.com/api-keys))
 
 ### 1. Clonar o repositório
 
@@ -96,7 +96,9 @@ POSTGRES_PASSWORD=uma_senha_segura
 
 ```env
 DJANGO_SECRET_KEY=uma_chave_secreta_qualquer
-GEMINI_API_KEY=sua_chave_do_gemini
+AI_PROVIDER=openai
+OPENAI_API_KEY=sua_chave_da_openai
+OPENAI_MODEL_NAME=gpt-4o
 ```
 
 Suba os containers e aplique as migrações:
@@ -142,7 +144,9 @@ A aplicação abre em **http://localhost:5173** (Vite faz proxy de `/api` → ba
 | Variável | Descrição |
 |---|---|
 | `DJANGO_SECRET_KEY` | Chave secreta do Django (obrigatória) |
-| `GEMINI_API_KEY` | Chave da API do Google Gemini |
+| `AI_PROVIDER` | Provedor de IA: `openai` ou `gemini` |
+| `OPENAI_API_KEY` | Chave da API da OpenAI |
+| `OPENAI_MODEL_NAME` | Modelo OpenAI (ex.: `gpt-4o`) |
 | `POSTGRES_*` | Credenciais do PostgreSQL |
 
 ---
