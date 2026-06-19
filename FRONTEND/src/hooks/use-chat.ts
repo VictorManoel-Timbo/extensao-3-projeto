@@ -1,25 +1,38 @@
+import { useState } from "react";
 import { chatService } from "@/services/chat.service";
+import { useToast } from "@/hooks/use-toast";
 import { useChatList } from "./use-chat-list";
 import { useMessages } from "./use-messages";
 
 export type { Message } from "./use-messages";
 
-export const useChat = () => {
-  const chatList = useChatList();
+export const useChat = (initialChatId: string | null = null) => {
+  const { toast } = useToast();
+  const chatList = useChatList(initialChatId);
   const { messages, isChatPending, handleSend, clearMessages, loading: msgLoading, error: msgError } =
     useMessages(chatList.activeId, chatList.setActiveId, chatList.addChat);
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loading = chatList.loading || msgLoading;
   const error = chatList.error || msgError;
 
   const handleDelete = (chatId: string) => {
+    setDeletingId(chatId);
     chatService
       .deletar(chatId)
       .then(() => {
         chatList.removeChat(chatId);
         clearMessages(chatId);
+        toast({ variant: "success", description: "Conversa excluída." });
       })
-      .catch(() => chatList.setError("Erro ao deletar conversa."));
+      .catch(() =>
+        toast({
+          variant: "error",
+          description: "Não foi possível excluir a conversa.",
+        }),
+      )
+      .finally(() => setDeletingId(null));
   };
 
   return {
@@ -29,6 +42,7 @@ export const useChat = () => {
     loading,
     error,
     isChatPending,
+    deletingId,
     handleNewChat: chatList.handleNewChat,
     handleSelect: chatList.handleSelect,
     handleDelete,

@@ -45,7 +45,7 @@ export const useOpenFood = (): UseOpenFoodReturn => {
         setError(null);
 
         try {
-            const data = await openFoodService.getProdut({ barcode, fields });
+            const data = await openFoodService.getProduct({ barcode, fields });
 
             if (data.status === 0) {
                 setError("Produto não encontrado");

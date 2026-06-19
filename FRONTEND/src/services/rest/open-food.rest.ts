@@ -10,6 +10,10 @@ export const openFoodRest = {
      * @param params Objeto contendo os fields desejados
      */
     getProduct: (barcode: string, params?: { fields: string }): Promise<IOpenFoodProduct> => {
+        // Aceita apenas dígitos para prevenir path traversal na URL.
+        if (!/^\d+$/.test(barcode)) {
+            return Promise.reject(new Error("Barcode inválido"));
+        }
         return api.get(`${barcode}.json`, params, BASE_URL);
     }
 };

@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import environ
-import os
+from datetime import timedelta
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -29,7 +29,7 @@ if READ_DOT_ENV_FILE:
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-s+)m31_+_2ubv)j)xkn2(#m_d!)(#cs3s!ehs&wm!cn)r!(w2n"
+SECRET_KEY = env("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -53,11 +53,10 @@ THIRD_PARTY_APPS = [
     "crispy_forms",
     "crispy_tailwind",
     "django_tailwind_cli",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
     "rest_framework",
     "rest_framework.authtoken",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
 ]
 
@@ -74,27 +73,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
-
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
-    },
-]
-
-FORM_RENDERER = "django.forms.renderers.TemplatesSetting"
 
 WSGI_APPLICATION = "config.wsgi.application"
 
@@ -114,6 +95,12 @@ DATABASES = {
 DATABASES["default"]["ATOMIC_REQUESTS"] = True
 
 AUTH_USER_MODEL = "users.User"
+
+# Authentication backends — login por email (RF003) + fallback padrão para o admin
+AUTHENTICATION_BACKENDS = [
+    "foodguard.users.backends.EmailBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -209,26 +196,54 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # https://www.django-rest-framework.org/api-guide/pagination/#setting-the-pagination-style
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.BasicAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '100/hour',
+        'ai': '30/hour',
+        'auth': '10/minute',
+    },
 }
 
+# SimpleJWT
+# https://django-rest-framework-simplejwt.readthedocs.io/
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    # RQ002: sessão expira após 24h de inatividade
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=24),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    # Login por email (RF003)
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+
+# AI provider selection: "gemini" | "openai"
+AI_PROVIDER = env("AI_PROVIDER", default="gemini")
+
 # Gemini API
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "default_api_key")
+GEMINI_API_KEY = env("GEMINI_API_KEY")
 GEMINI_MODEL_NAME = "gemini-2.5-flash"
 GEMINI_TEMPERATURE = 0.7
-SYSTEM_PROMPT_PATH = os.path.join(BASE_DIR, "data", "system_prompt.md")
+
+# OpenAI API
+OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
+OPENAI_MODEL_NAME = env("OPENAI_MODEL_NAME", default="gpt-4o-mini")
+OPENAI_TEMPERATURE = env.float("OPENAI_TEMPERATURE", default=0.7)
+
+# Modelo auxiliar (leve) para extrair contexto do usuário em paralelo.
+CONTEXT_MODEL_NAME = env("CONTEXT_MODEL_NAME", default="gpt-4o-mini")
 
 # LOGGER CONFIGURATION
-# settings.py
-import os
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

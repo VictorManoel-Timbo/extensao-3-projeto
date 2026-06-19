@@ -13,19 +13,20 @@ type ChatInputProps = {
 
 const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const [value, setValue] = useState("");
-  const [image, setImage] = useState<File | null>();
+  const [image, setImage] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const [isScanning, setIsScanning] = useState(false);
+  const [scanFailed, setScanFailed] = useState(false);
   const { decodeBarcodeFromFile } = useBarcode();
   const { fetchProduct, productData, isLoading: isProductLoading, isError, error, reset: resetProduct } = useOpenFood();
 
   const isBusy = disabled || isScanning || isProductLoading;
 
-  const handleSubmit = (e?: React.BaseSyntheticEvent | React.KeyboardEvent) => {
-    e?.preventDefault();
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
     if (isBusy || (!value.trim() && !image)) return;
 
     onSend(value, image || undefined, productData || undefined);
@@ -52,15 +53,20 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       setPreviewUrl(URL.createObjectURL(file));// Cria uma URL temporária para o preview
 
       setIsScanning(true);
+      setScanFailed(false);
       resetProduct();
 
       try {
         const barcode = await decodeBarcodeFromFile(file);
         if (barcode) {
           await fetchProduct(barcode);
+        } else {
+          // Nenhum código de barras encontrado na imagem (B012).
+          setScanFailed(true);
         }
       } catch (err) {
         console.error("Erro ao tentar ler o código de barras", err);
+        setScanFailed(true);
       } finally {
         setIsScanning(false);
       }
@@ -74,6 +80,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       setPreviewUrl(null);
     }
     if (fileRef.current) fileRef.current.value = '';
+    setScanFailed(false);
     resetProduct();
   }
 
@@ -138,6 +145,13 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
               {error || "Código de barras detectado, mas produto não encontrado."}
             </div>
           )}
+
+          {scanFailed && !isScanning && !isProductLoading && (
+            <div className="text-xs font-medium text-amber-600 px-1">
+              Não identificamos um código de barras nesta imagem. Você ainda pode
+              descrever o produto na mensagem e enviar.
+            </div>
+          )}
         </div>
       )}
 
@@ -151,12 +165,14 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           className="hidden"
         />
 
-        <div
+        <button
+          type="button"
           onClick={() => fileRef.current?.click()}
+          aria-label="Escanear código de barras"
           className="flex items-center justify-center bg-transparent p-2 cursor-pointer rounded-full transition-all"
         >
           <LuScanBarcode className="text-2xl text-black" />
-        </div>
+        </button>
 
         <textarea
           ref={textareaRef}

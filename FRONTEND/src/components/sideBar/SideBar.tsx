@@ -1,5 +1,5 @@
-import { Menu, SquarePen, MoreVertical, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { Menu, SquarePen, MoreVertical, Trash2, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type Conversation = { id: string; title: string };
@@ -12,6 +12,7 @@ type SidebarProps = {
   activeId: string | null;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  deletingId?: string | null;
 };
 
 const Sidebar = ({
@@ -22,11 +23,29 @@ const Sidebar = ({
   activeId,
   onSelect,
   onDelete,
+  deletingId,
 }: SidebarProps) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o dropdown ao clicar fora dele.
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openMenuId]);
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    const confirmed = window.confirm(
+      "Tem certeza que deseja deletar esta conversa? Esta ação não pode ser desfeita.",
+    );
+    if (!confirmed) return;
     onDelete(id);
     setOpenMenuId(null);
   };
@@ -69,6 +88,7 @@ const Sidebar = ({
               return (
                 <li key={c.id}>
                   <div
+                    ref={isOpen ? menuRef : undefined}
                     className={cn(
                       "group relative flex w-full cursor-default items-center justify-between rounded-lg px-3 py-2 text-left font-semibold transition-colors",
                       active
@@ -78,7 +98,7 @@ const Sidebar = ({
                   >
                     <button
                       onClick={() => onSelect(c.id)}
-                      className="flex-1 truncate text-left"
+                      className="min-w-0 flex-1 truncate text-left"
                     >
                       {c.title}
                     </button>
@@ -95,9 +115,14 @@ const Sidebar = ({
                       <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                         <button
                           onClick={(e) => handleDelete(e, c.id)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg w-full"
+                          disabled={deletingId === c.id}
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg w-full disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {deletingId === c.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
                           Deletar
                         </button>
                       </div>

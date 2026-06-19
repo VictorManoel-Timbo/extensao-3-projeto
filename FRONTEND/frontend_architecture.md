@@ -135,23 +135,49 @@ Component (ChatInput.tsx)
 ```env
 VITE_OPENFOOD_URL=https://world.openfoodfacts.org/api/v0/product/
 VITE_BASE_URL=http://localhost:8000
-VITE_API_USERNAME=<django username>
-VITE_API_PASSWORD=<django password>
 ```
 
 Vite proxy rewrites:
 - `/api/*` → `VITE_BASE_URL` (Django backend)
 - `/openfood/*` → `VITE_OPENFOOD_URL` (Open Food Facts)
 
-Backend authentication uses **HTTP Basic Auth** configured in `axiosConfig.ts`.
+Backend authentication uses **JWT (access + refresh)** via `djangorestframework-simplejwt`.
+Tokens are stored in `localStorage` (`config/tokenStorage.ts`) and injected as
+`Authorization: Bearer <access>` by the request interceptor in `axiosConfig.ts`.
+On a `401`, the response interceptor transparently refreshes the access token once
+(`/auth/token/refresh/`) and retries; if refresh fails, storage is cleared and the
+user is sent to `/login`.
+
+### Auth layer
+
+| File | Role |
+|---|---|
+| `config/tokenStorage.ts` | localStorage helpers for access/refresh/user |
+| `context/AuthContext.tsx` | global session state (`user`, `isAuthenticated`, `hasAnamnese`, `login`, `register`, `logout`, `markAnamneseDone`) |
+| `hooks/use-auth.ts` | `useAuth()` consumer of `AuthContext` |
+| `services/auth.service.ts` + `rest/auth.rest.ts` | register / login / logout / me |
+| `services/anamnese.service.ts` + `rest/anamnese.rest.ts` | create / get / update anamnese |
+| `models/auth.model.ts`, `models/anamnese.model.ts` | typed payloads mirroring the backend |
 
 ---
 
 ## Routing
 
-- Defined in `App.tsx` using `BrowserRouter` + `<Routes>`.
-- Currently only one route: `GET /` → `<Index />`.
-- `src/router/router.tsx` is empty — add new routes in `App.tsx`.
+- Defined in `src/router/router.tsx` using `createBrowserRouter`; `App.tsx` wraps it in `<AuthProvider>` + `RouterProvider`.
+- Route guards live in `src/router/guards.tsx` (kept separate so `router.tsx` only exports the route object — Fast Refresh rule):
+  - `GuestOnlyRoute` — `/login`, `/cadastro`, `/esqueci-senha`; redirects authenticated users to `/chat` (RN007).
+  - `ProtectedRoute` — requires an active session; otherwise redirects to `/login` (RN007).
+  - `GalleryRoute` — anamnese gate (RN001): `/galeria` requires a completed anamnese, else redirects to `/anamnese`.
+  - `ChatRoute` — anamnese gate (RN001): `/chat` and `/chat/:chatId` require a completed anamnese; `:chatId` opens that conversation in `Index` via `initialChatId`.
+- Routes: `/` (Landing), `/login`, `/cadastro`, `/esqueci-senha`, `/anamnese` (`AnamneseGate`), `/galeria` (`Galeria` — post-login home), `/chat` + `/chat/:chatId` (`Index`).
+- **Post-login landing is `/galeria`** (the chat gallery). `LandingRoute`, `GuestOnlyRoute` and `Login` all redirect authenticated users there.
+
+### Gallery (`/galeria`)
+
+- `pages/Galeria.tsx` — chat gallery grid. A "Criar nova conversa" card (→ `/chat`) plus one `ChatCard` per conversation. Filter tabs by severity (Todos / Seguros / Atenção / Perigosos).
+- `components/gallery/ChatCard.tsx` — card: product image (`chat.image_url`) or default `Utensils` icon, severity badge (`VERDICT_META`), title, date (`date-fns` ptBR), and a `...` delete menu.
+- `hooks/use-gallery.ts` — fetches chats (`chatService.listar`), holds the severity filter, exposes `filteredChats` and `handleDelete`.
+- `lib/verdict.ts` — `SEVERITY_FILTERS` (filter buckets) + `matchesSeverityFilter()` map the 5 verdict levels to the gallery tabs.
 
 ---
 
@@ -176,9 +202,18 @@ Class utility: always use `cn()` from `@/lib/utils` for conditional Tailwind cla
 
 ## UI components (shadcn/ui)
 
-Located in `src/components/ui/`. Generated and updated via `shadcn` CLI. **Do not edit manually** — customizations go in CSS variables in `index.css` or by overriding classes at the usage site.
+Located in `src/components/ui/`. shadcn-generated components are updated via `shadcn` CLI — **do not edit those manually** (customizations go in CSS variables in `index.css` or by overriding classes at the usage site).
 
-Available: `button`, `calendar`, `drawer`, `dropdown-menu`.
+Available (shadcn): `button`, `calendar`, `drawer`, `dropdown-menu`.
+
+Custom shared primitives (hand-written, safe to edit): `Radio`, `PasswordField`.
+- `PasswordField` — password input with show/hide toggle and optional live strength meter + requirements checklist (`showStrength`) and inline `error` message. Strength/criteria logic lives in `src/lib/password.ts` (mirrors `PASSWORD_REGEX`). Used in `CadastroForm` and `EditProfileModal`.
+
+### Notifications (toast / snackbar)
+
+- `context/ToastContext.tsx` — `<ToastProvider>` (mounted in `App.tsx`, inside `AuthProvider`) renders a Radix Toast viewport (bottom-right). Variants: `default` / `success` / `error`; supports optional `action` (e.g. "Desfazer") and `duration`.
+- `hooks/use-toast.ts` — `useToast()` → `{ toast({ title?, description, variant?, action?, duration? }) }`.
+- **When to use:** transient confirmations of completed async actions or background errors (delete, profile/anamnese update, register, logout). Keep **form validation errors inline** (Login, register, anamnese) — they stay next to the field.
 
 ---
 
@@ -191,6 +226,9 @@ interface Chat {
   title: string | null;
   created_at: string;
   is_active: boolean;
+  is_open: boolean;
+  image_url: string | null;   // product image (OpenFoodFacts), shown on gallery card
+  severity: Verdict | null;   // most recent verdict of the chat — drives badge + filter
   messages: string;
 }
 ```
