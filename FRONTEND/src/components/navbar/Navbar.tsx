@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import EditProfileModal from "@/components/profile/EditProfileModal"
 import { useAuth } from "@/hooks/use-auth"
+import { useToast } from "@/hooks/use-toast"
 
 type NavBarProps = {
     variant?: "home" | "app"
@@ -22,11 +23,13 @@ const scrollTo = (id: string) => {
 const NavBar = ({ variant = "home" }: NavBarProps) => {
     const navigate = useNavigate();
     const { logout, isAuthenticated } = useAuth();
+    const { toast } = useToast();
     const [profileOpen, setProfileOpen] = useState(false);
 
     const handleLogout = async () => {
         try {
             await logout();
+            toast({ description: "Você saiu da sua conta." });
             navigate("/", { replace: true });
         } catch (err) {
             console.error("Erro ao sair:", err);
@@ -40,7 +43,7 @@ const NavBar = ({ variant = "home" }: NavBarProps) => {
                     <button
                         onClick={() => variant === "home"
                             ? window.scrollTo({ top: 0, behavior: "smooth" })
-                            : navigate("/")
+                            : navigate("/galeria")
                         }
                         className="font-sansita text-4xl font-extrabold tracking-tight text-black"
                     >
@@ -65,10 +68,10 @@ const NavBar = ({ variant = "home" }: NavBarProps) => {
                             </>
                         ) : (
                             <button
-                                onClick={() => navigate("/")}
+                                onClick={() => navigate("/galeria")}
                                 className="text-base font-semibold text-black transition-colors hover:text-foodguard-500"
                             >
-                                Página inicial
+                                Galeria de chats
                             </button>
                         )}
                     </nav>

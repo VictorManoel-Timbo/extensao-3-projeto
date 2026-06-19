@@ -202,9 +202,18 @@ Class utility: always use `cn()` from `@/lib/utils` for conditional Tailwind cla
 
 ## UI components (shadcn/ui)
 
-Located in `src/components/ui/`. Generated and updated via `shadcn` CLI. **Do not edit manually** — customizations go in CSS variables in `index.css` or by overriding classes at the usage site.
+Located in `src/components/ui/`. shadcn-generated components are updated via `shadcn` CLI — **do not edit those manually** (customizations go in CSS variables in `index.css` or by overriding classes at the usage site).
 
-Available: `button`, `calendar`, `drawer`, `dropdown-menu`.
+Available (shadcn): `button`, `calendar`, `drawer`, `dropdown-menu`.
+
+Custom shared primitives (hand-written, safe to edit): `Radio`, `PasswordField`.
+- `PasswordField` — password input with show/hide toggle and optional live strength meter + requirements checklist (`showStrength`) and inline `error` message. Strength/criteria logic lives in `src/lib/password.ts` (mirrors `PASSWORD_REGEX`). Used in `CadastroForm` and `EditProfileModal`.
+
+### Notifications (toast / snackbar)
+
+- `context/ToastContext.tsx` — `<ToastProvider>` (mounted in `App.tsx`, inside `AuthProvider`) renders a Radix Toast viewport (bottom-right). Variants: `default` / `success` / `error`; supports optional `action` (e.g. "Desfazer") and `duration`.
+- `hooks/use-toast.ts` — `useToast()` → `{ toast({ title?, description, variant?, action?, duration? }) }`.
+- **When to use:** transient confirmations of completed async actions or background errors (delete, profile/anamnese update, register, logout). Keep **form validation errors inline** (Login, register, anamnese) — they stay next to the field.
 
 ---
 

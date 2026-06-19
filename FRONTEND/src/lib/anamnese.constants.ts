@@ -28,6 +28,46 @@ export const inputClass =
 export const textareaClass =
     "w-full resize-none rounded-md border border-zinc-500 bg-slate-50 px-3 py-2 text-black focus:border-foodguard-500 focus:outline-none focus:ring-2 focus:ring-foodguard-500/30";
 
+/** Classe de realce para um campo inválido (borda/anel vermelhos). */
+export const fieldErrorClass =
+    "border-red-500 focus:border-red-500 focus:ring-red-500/30";
+
+export type AnamneseValidationError = { field: string; message: string };
+
+/**
+ * Valida os campos obrigatórios da anamnese e retorna o primeiro inválido
+ * (chave + mensagem) ou `null`. Compartilhado entre cadastro e perfil.
+ */
+export const validateAnamnese = (v: {
+    consulta: string;
+    objetivo: string;
+    alergia: string;
+    intolerancia: string;
+    doencas: string;
+    medicamentos: string;
+    pref: string;
+    naoGosta: string;
+}): AnamneseValidationError | null => {
+    if (v.consulta === "sim" && !v.objetivo.trim())
+        return {
+            field: "objetivo",
+            message: "Informe o objetivo da consulta prévia com nutricionista.",
+        };
+
+    const required: [string, string, string][] = [
+        ["alergia", v.alergia, 'Informe suas alergias alimentares (ou "Nenhuma").'],
+        ["intolerancia", v.intolerancia, 'Informe suas intolerâncias alimentares (ou "Nenhuma").'],
+        ["doencas", v.doencas, 'Informe seu histórico de doenças (ou "Nenhum").'],
+        ["medicamentos", v.medicamentos, 'Informe os medicamentos em uso (ou "Nenhum").'],
+        ["pref", v.pref, "Informe ao menos um alimento de preferência."],
+        ["naoGosta", v.naoGosta, 'Informe os alimentos que você não gosta (ou "Nenhum").'],
+    ];
+    for (const [field, value, message] of required) {
+        if (!value.trim()) return { field, message };
+    }
+    return null;
+};
+
 /** Extrai a primeira mensagem de erro de uma resposta DRF (AxiosError). */
 export const extractError = (
     err: unknown,
@@ -66,12 +106,12 @@ export const buildAnamnesePayload = (v: AnamneseFormValues): AnamneseRequest => 
         previous_consultation: isPrevious,
         previous_consultation_objective: isPrevious ? v.objetivo.trim() : null,
         previous_consultation_result: isPrevious ? v.resultado.trim() || null : null,
-        disease_history: v.doencas.trim() || null,
-        medications: v.medicamentos.trim() || null,
-        food_allergies: v.alergia.trim() || null,
-        food_intolerances: v.intolerancia.trim() || null,
+        disease_history: v.doencas.trim(),
+        medications: v.medicamentos.trim(),
+        food_allergies: v.alergia.trim(),
+        food_intolerances: v.intolerancia.trim(),
         favorite_foods: v.pref.trim(),
-        food_aversions: v.naoGosta.trim() || null,
+        food_aversions: v.naoGosta.trim(),
         body_feeling: FEELING_MAP[v.sentimento] ?? null,
         eating_style: v.veg,
         alcohol_intake: v.alcool === "sim",

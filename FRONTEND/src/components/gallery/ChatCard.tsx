@@ -61,11 +61,19 @@ const ChatCard = ({ chat, onOpen, onDelete, deleting }: ChatCardProps) => {
   const verdictMeta = chat.severity ? VERDICT_META[chat.severity] : null;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Abrir conversa: ${chat.title ?? "Nova conversa"}`}
       onClick={() => onOpen(chat.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(chat.id);
+        }
+      }}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border bg-white text-left shadow-sm shadow-black/10 transition-all hover:-translate-y-0.5 hover:shadow-md",
+        "group relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-white text-left shadow-sm shadow-black/10 transition-all hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-foodguard-500 focus-visible:ring-offset-2",
         chat.severity ? RING_BY_VERDICT[chat.severity] : "border-zinc-300",
       )}
     >
@@ -134,7 +142,7 @@ const ChatCard = ({ chat, onOpen, onDelete, deleting }: ChatCardProps) => {
           {formatDate(chat.created_at)}
         </span>
       </div>
-    </button>
+    </div>
   );
 };
 

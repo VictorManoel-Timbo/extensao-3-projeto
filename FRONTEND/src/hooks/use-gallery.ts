@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Chat } from "@/models/chat.model";
 import { chatService } from "@/services/chat.service";
+import { useToast } from "@/hooks/use-toast";
 import { matchesSeverityFilter, type SeverityFilter } from "@/lib/verdict";
 
 /**
@@ -8,6 +9,7 @@ import { matchesSeverityFilter, type SeverityFilter } from "@/lib/verdict";
  * selecionado, expõe a lista já filtrada e a exclusão de conversas.
  */
 export const useGallery = () => {
+  const { toast } = useToast();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +40,16 @@ export const useGallery = () => {
     setDeletingId(chatId);
     chatService
       .deletar(chatId)
-      .then(() => setChats((prev) => prev.filter((c) => c.id !== chatId)))
-      .catch(() => setError("Erro ao deletar conversa."))
+      .then(() => {
+        setChats((prev) => prev.filter((c) => c.id !== chatId));
+        toast({ variant: "success", description: "Conversa excluída." });
+      })
+      .catch(() =>
+        toast({
+          variant: "error",
+          description: "Não foi possível excluir a conversa.",
+        }),
+      )
       .finally(() => setDeletingId(null));
   };
 

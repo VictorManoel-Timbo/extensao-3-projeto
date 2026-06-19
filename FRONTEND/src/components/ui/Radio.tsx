@@ -26,7 +26,7 @@ const Radio = ({ name, value, checked, onChange, label, disabled = false }: Radi
             className="peer sr-only"
         />
         <span
-            className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors ${checked ? "border-foodguard-700" : "border-zinc-500"
+            className={`flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-foodguard-500 peer-focus-visible:ring-offset-2 ${checked ? "border-foodguard-700" : "border-zinc-500"
                 }`}
         >
             {checked && <span className="h-2.5 w-2.5 rounded-full bg-foodguard-500" />}

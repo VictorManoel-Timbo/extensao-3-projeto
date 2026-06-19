@@ -98,7 +98,7 @@ const Sidebar = ({
                   >
                     <button
                       onClick={() => onSelect(c.id)}
-                      className="flex-1 truncate text-left"
+                      className="min-w-0 flex-1 truncate text-left"
                     >
                       {c.title}
                     </button>

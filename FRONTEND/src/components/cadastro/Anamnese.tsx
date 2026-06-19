@@ -1,14 +1,37 @@
 import { useState } from "react";
-import { HelpCircle } from "lucide-react";
 import type { AnamneseRequest, EatingStyle } from "@/models/anamnese.model";
 import Radio from "@/components/ui/Radio";
-import { buildAnamnesePayload, textareaClass } from "@/lib/anamnese.constants";
+import InfoTooltip from "@/components/ui/InfoTooltip";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import {
+  buildAnamnesePayload,
+  textareaClass,
+  fieldErrorClass,
+  validateAnamnese,
+} from "@/lib/anamnese.constants";
 
 interface Props {
   onSubmit: (data: AnamneseRequest) => Promise<void>;
   submitting?: boolean;
   error?: string | null;
 }
+
+/** Marcador visual de campo obrigatório (C-02). */
+const Required = () => (
+  <span className="text-red-600" aria-hidden="true"> *</span>
+);
+
+/** Mapa chave-do-campo → id do elemento, para focar o campo inválido. */
+const FIELD_IDS: Record<string, string> = {
+  objetivo: "anamnese-objetivo",
+  alergia: "anamnese-alergia",
+  intolerancia: "anamnese-intolerancia",
+  doencas: "anamnese-doencas",
+  medicamentos: "anamnese-medicamentos",
+  pref: "anamnese-pref",
+  naoGosta: "anamnese-nao-gosta",
+};
 
 const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
   const [consulta, setConsulta] = useState("nao");
@@ -25,20 +48,41 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
   const [alcool, setAlcool] = useState("nao");
   const [fumo, setFumo] = useState("nao");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [errorField, setErrorField] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  // onChange que limpa o realce de erro do próprio campo ao ser editado.
+  const fieldProps = (key: string, setter: (v: string) => void) => ({
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setter(e.target.value);
+      if (errorField === key) setErrorField(null);
+    },
+    "aria-invalid": errorField === key || undefined,
+    className: cn(textareaClass, errorField === key && fieldErrorClass),
+  });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLocalError(null);
 
-    const isPrevious = consulta === "sim";
-    if (isPrevious && !objetivo.trim()) {
-      setLocalError("Informe o objetivo da consulta prévia com nutricionista.");
+    const validationError = validateAnamnese({
+      consulta,
+      objetivo,
+      alergia,
+      intolerancia,
+      doencas,
+      medicamentos,
+      pref,
+      naoGosta,
+    });
+    if (validationError) {
+      setErrorField(validationError.field);
+      setLocalError(validationError.message);
+      toast({ variant: "error", description: validationError.message });
+      document.getElementById(FIELD_IDS[validationError.field])?.focus();
       return;
     }
-    if (!pref.trim()) {
-      setLocalError("Informe ao menos um alimento de preferência.");
-      return;
-    }
+    setErrorField(null);
 
     const payload = buildAnamnesePayload({
       consulta,
@@ -63,9 +107,15 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
     <form onSubmit={handleSubmit}>
       <div className="flex items-center gap-3">
         <h2 className="font-sansita text-2xl font-extrabold tracking-tight text-black sm:text-3xl">
-          FORMULÁRIO DE FORMULÁRIO DE SAÚDE
+          FORMULÁRIO DE SAÚDE
         </h2>
-        <HelpCircle className="h-8 w-8 text-foodguard-600" aria-hidden="true" />
+        <InfoTooltip label="O que é o Formulário de Saúde?">
+          O Formulário de Saúde (anamnese) reúne seu histórico alimentar e de
+          saúde — alergias, intolerâncias, doenças, medicamentos e preferências.
+          O FoodGuard usa esses dados para personalizar a análise de segurança
+          dos alimentos que você consome. Quanto mais completo, mais precisas
+          são as recomendações.
+        </InfoTooltip>
       </div>
 
       {(localError || error) && (
@@ -73,6 +123,10 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
           {localError || error}
         </div>
       )}
+
+      <p className="mt-4 text-xs text-gray-700">
+        Campos marcados com <span className="text-red-600">*</span> são obrigatórios.
+      </p>
 
       <div className="mt-8 grid gap-8 sm:grid-cols-2">
         <div className="space-y-3">
@@ -104,14 +158,14 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
                 htmlFor="anamnese-objetivo"
                 className="block font-semibold text-black"
               >
-                Qual era o objetivo na época?
+                Qual era o objetivo na época?<Required />
               </label>
               <textarea
                 id="anamnese-objetivo"
                 value={objetivo}
-                onChange={(e) => setObjetivo(e.target.value)}
                 rows={4}
-                className={textareaClass}
+                aria-required="true"
+                {...fieldProps("objetivo", setObjetivo)}
               />
             </div>
             <div className="space-y-2">
@@ -137,14 +191,14 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
             htmlFor="anamnese-intolerancia"
             className="block font-semibold text-black"
           >
-            Tem intolerância a algum alimento? Se sim, qual?
+            Tem intolerância a algum alimento? Se sim, qual?<Required />
           </label>
           <textarea
             id="anamnese-intolerancia"
             value={intolerancia}
-            onChange={(e) => setIntolerancia(e.target.value)}
             rows={4}
-            className={textareaClass}
+            aria-required="true"
+            {...fieldProps("intolerancia", setIntolerancia)}
           />
         </div>
 
@@ -153,14 +207,14 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
             htmlFor="anamnese-alergia"
             className="block font-semibold text-black"
           >
-            Possui alergia a algum alimento? Se sim, qual?
+            Possui alergia a algum alimento? Se sim, qual?<Required />
           </label>
           <textarea
             id="anamnese-alergia"
             value={alergia}
-            onChange={(e) => setAlergia(e.target.value)}
             rows={4}
-            className={textareaClass}
+            aria-required="true"
+            {...fieldProps("alergia", setAlergia)}
           />
         </div>
 
@@ -169,14 +223,14 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
             htmlFor="anamnese-doencas"
             className="block font-semibold text-black"
           >
-            Você possui histórico de doenças? Se sim, quais?
+            Você possui histórico de doenças? Se sim, quais?<Required />
           </label>
           <textarea
             id="anamnese-doencas"
             value={doencas}
-            onChange={(e) => setDoencas(e.target.value)}
             rows={4}
-            className={textareaClass}
+            aria-required="true"
+            {...fieldProps("doencas", setDoencas)}
           />
         </div>
 
@@ -185,14 +239,14 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
             htmlFor="anamnese-medicamentos"
             className="block font-semibold text-black"
           >
-            Faz uso de algum medicamento? Se sim, qual?
+            Faz uso de algum medicamento? Se sim, qual?<Required />
           </label>
           <textarea
             id="anamnese-medicamentos"
             value={medicamentos}
-            onChange={(e) => setMedicamentos(e.target.value)}
             rows={4}
-            className={textareaClass}
+            aria-required="true"
+            {...fieldProps("medicamentos", setMedicamentos)}
           />
         </div>
 
@@ -201,14 +255,14 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
             htmlFor="anamnese-pref"
             className="block font-semibold text-black"
           >
-            Alimentos que você tem preferência?
+            Alimentos que você tem preferência?<Required />
           </label>
           <textarea
             id="anamnese-pref"
             value={pref}
-            onChange={(e) => setPref(e.target.value)}
             rows={4}
-            className={textareaClass}
+            aria-required="true"
+            {...fieldProps("pref", setPref)}
           />
         </div>
 
@@ -217,14 +271,14 @@ const AnamneseStep = ({ onSubmit, submitting = false, error }: Props) => {
             htmlFor="anamnese-nao-gosta"
             className="block font-semibold text-black"
           >
-            Alimentos que você não gosta?
+            Alimentos que você não gosta?<Required />
           </label>
           <textarea
             id="anamnese-nao-gosta"
             value={naoGosta}
-            onChange={(e) => setNaoGosta(e.target.value)}
             rows={4}
-            className={textareaClass}
+            aria-required="true"
+            {...fieldProps("naoGosta", setNaoGosta)}
           />
         </div>
 

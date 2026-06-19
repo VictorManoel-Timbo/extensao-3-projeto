@@ -19,6 +19,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const [isScanning, setIsScanning] = useState(false);
+  const [scanFailed, setScanFailed] = useState(false);
   const { decodeBarcodeFromFile } = useBarcode();
   const { fetchProduct, productData, isLoading: isProductLoading, isError, error, reset: resetProduct } = useOpenFood();
 
@@ -52,15 +53,20 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       setPreviewUrl(URL.createObjectURL(file));// Cria uma URL temporária para o preview
 
       setIsScanning(true);
+      setScanFailed(false);
       resetProduct();
 
       try {
         const barcode = await decodeBarcodeFromFile(file);
         if (barcode) {
           await fetchProduct(barcode);
+        } else {
+          // Nenhum código de barras encontrado na imagem (B012).
+          setScanFailed(true);
         }
       } catch (err) {
         console.error("Erro ao tentar ler o código de barras", err);
+        setScanFailed(true);
       } finally {
         setIsScanning(false);
       }
@@ -74,6 +80,7 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
       setPreviewUrl(null);
     }
     if (fileRef.current) fileRef.current.value = '';
+    setScanFailed(false);
     resetProduct();
   }
 
@@ -136,6 +143,13 @@ const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
           {isError && !isScanning && !isProductLoading && (
             <div className="text-xs font-medium text-red-500 px-1">
               {error || "Código de barras detectado, mas produto não encontrado."}
+            </div>
+          )}
+
+          {scanFailed && !isScanning && !isProductLoading && (
+            <div className="text-xs font-medium text-amber-600 px-1">
+              Não identificamos um código de barras nesta imagem. Você ainda pode
+              descrever o produto na mensagem e enviar.
             </div>
           )}
         </div>
