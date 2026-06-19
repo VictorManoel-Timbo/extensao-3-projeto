@@ -1,14 +1,22 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Calendar, Eye, EyeOff, Mail, User } from "lucide-react";
+import { Calendar, Mail, User } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import PasswordField from "@/components/ui/PasswordField";
 import { PASSWORD_REGEX, inputClass, extractError } from "@/lib/anamnese.constants";
 
 const NAME_REGEX = /^[a-zA-ZÀ-ÿ '-]+$/;
 
+/** Marcador visual de campo obrigatório (C-02). */
+const Required = () => (
+    <span className="text-red-600" aria-hidden="true"> *</span>
+);
+
 const CadastroForm = () => {
     const navigate = useNavigate();
     const { register } = useAuth();
+    const { toast } = useToast();
 
     const [name, setName] = useState("");
     const [username, setUsername] = useState("");
@@ -16,15 +24,26 @@ const CadastroForm = () => {
     const [dob, setDob] = useState("");
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
-    const [showPwd, setShowPwd] = useState(false);
-    const [showPwd2, setShowPwd2] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
+
+    // Limites da data de nascimento: não pode ser futura nem implausivelmente
+    // antiga (C-01). Comparação lexical é segura para o formato "YYYY-MM-DD".
+    const today = new Date().toISOString().slice(0, 10);
+    const minDob = (() => {
+        const d = new Date();
+        d.setFullYear(d.getFullYear() - 120);
+        return d.toISOString().slice(0, 10);
+    })();
 
     const validate = (): string | null => {
         if (!NAME_REGEX.test(name.trim()))
             return "O nome deve conter apenas letras, espaços, apóstrofos e hífens.";
         if (name.length > 250) return "O nome deve ter no máximo 250 caracteres.";
+        if (dob) {
+            if (dob > today) return "A data de nascimento não pode ser uma data futura.";
+            if (dob < minDob) return "Informe uma data de nascimento válida.";
+        }
         if (!PASSWORD_REGEX.test(password))
             return "A senha precisa de no mínimo 8 caracteres, com maiúscula, minúscula e número.";
         if (password !== confirm) return "As senhas não coincidem.";
@@ -38,6 +57,7 @@ const CadastroForm = () => {
         const validationError = validate();
         if (validationError) {
             setError(validationError);
+            toast({ variant: "error", description: validationError });
             return;
         }
 
@@ -51,6 +71,7 @@ const CadastroForm = () => {
                 password,
                 password_confirm: confirm,
             });
+            toast({ variant: "success", description: "Conta criada com sucesso!" });
             navigate("/anamnese", { replace: true });
         } catch (err) {
             setError(extractError(err, "Não foi possível concluir o cadastro. Tente novamente."));
@@ -72,9 +93,13 @@ const CadastroForm = () => {
                     </div>
                 )}
 
+                <p className="text-xs text-gray-700">
+                    Campos marcados com <span className="text-red-600">*</span> são obrigatórios.
+                </p>
+
                 <div className="grid gap-6 sm:grid-cols-2">
                     <div className="space-y-2">
-                        <label htmlFor="cadastro-nome" className="block text-sm font-semibold text-black">Nome completo</label>
+                        <label htmlFor="cadastro-nome" className="block text-sm font-semibold text-black">Nome completo<Required /></label>
                         <div className="relative">
                             <input
                                 id="cadastro-nome"
@@ -82,6 +107,7 @@ const CadastroForm = () => {
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
+                                aria-required="true"
                                 maxLength={250}
                                 placeholder="Nome completo"
                                 className={inputClass}
@@ -91,7 +117,7 @@ const CadastroForm = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label htmlFor="cadastro-usuario" className="block text-sm font-semibold text-black">Seu usuário</label>
+                        <label htmlFor="cadastro-usuario" className="block text-sm font-semibold text-black">Seu usuário<Required /></label>
                         <div className="relative">
                             <input
                                 id="cadastro-usuario"
@@ -99,6 +125,7 @@ const CadastroForm = () => {
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 required
+                                aria-required="true"
                                 placeholder="Usuário"
                                 className={inputClass}
                             />
@@ -107,7 +134,7 @@ const CadastroForm = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label htmlFor="cadastro-email" className="block text-sm font-semibold text-black">Seu email</label>
+                        <label htmlFor="cadastro-email" className="block text-sm font-semibold text-black">Seu email<Required /></label>
                         <div className="relative">
                             <input
                                 id="cadastro-email"
@@ -115,6 +142,7 @@ const CadastroForm = () => {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
+                                aria-required="true"
                                 placeholder="Email"
                                 className={inputClass}
                             />
@@ -123,64 +151,51 @@ const CadastroForm = () => {
                     </div>
 
                     <div className="space-y-2">
-                        <label htmlFor="cadastro-dob" className="block text-sm font-semibold text-black">Data de nascimento</label>
+                        <label htmlFor="cadastro-dob" className="block text-sm font-semibold text-black">
+                            Data de nascimento{" "}
+                            <span className="font-normal text-gray-700">(opcional)</span>
+                        </label>
                         <div className="relative">
                             <input
                                 id="cadastro-dob"
                                 type="date"
                                 value={dob}
                                 onChange={(e) => setDob(e.target.value)}
+                                min={minDob}
+                                max={today}
                                 className={inputClass}
                             />
                             <Calendar className="pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-800" />
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <label htmlFor="cadastro-senha" className="block text-sm font-semibold text-black">Sua senha</label>
-                        <div className="relative">
-                            <input
-                                id="cadastro-senha"
-                                type={showPwd ? "text" : "password"}
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                placeholder="Senha"
-                                className={inputClass}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPwd((s) => !s)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-800 hover:text-black"
-                                aria-label={showPwd ? "Ocultar senha" : "Mostrar senha"}
-                            >
-                                {showPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                            </button>
-                        </div>
-                    </div>
+                    <PasswordField
+                        id="cadastro-senha"
+                        label={<>Sua senha<Required /></>}
+                        value={password}
+                        onChange={setPassword}
+                        required
+                        autoComplete="new-password"
+                        placeholder="Senha"
+                        inputClassName={inputClass}
+                        showStrength
+                    />
 
-                    <div className="space-y-2">
-                        <label htmlFor="cadastro-confirmar-senha" className="block text-sm font-semibold text-black">Confirmar a senha</label>
-                        <div className="relative">
-                            <input
-                                id="cadastro-confirmar-senha"
-                                type={showPwd2 ? "text" : "password"}
-                                value={confirm}
-                                onChange={(e) => setConfirm(e.target.value)}
-                                required
-                                placeholder="Confirme a senha"
-                                className={inputClass}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPwd2((s) => !s)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-800 hover:text-black"
-                                aria-label={showPwd2 ? "Ocultar senha" : "Mostrar senha"}
-                            >
-                                {showPwd2 ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                            </button>
-                        </div>
-                    </div>
+                    <PasswordField
+                        id="cadastro-confirmar-senha"
+                        label={<>Confirmar a senha<Required /></>}
+                        value={confirm}
+                        onChange={setConfirm}
+                        required
+                        autoComplete="new-password"
+                        placeholder="Confirme a senha"
+                        inputClassName={inputClass}
+                        error={
+                            confirm.length > 0 && confirm !== password
+                                ? "As senhas não coincidem."
+                                : undefined
+                        }
+                    />
                 </div>
 
                 <div>

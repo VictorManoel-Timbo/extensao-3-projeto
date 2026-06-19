@@ -1,26 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  X,
-  User as UserIcon,
-  Database,
-  Pencil,
-  Eye,
-  EyeOff,
-  Mail,
-} from "lucide-react";
+import { X, User as UserIcon, Database, Pencil, Mail } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/auth.service";
 import { anamneseService } from "@/services/anamnese.service";
 import { ANAMNESE_UPDATED_EVENT } from "@/lib/events";
 import Radio from "@/components/ui/Radio";
+import PasswordField from "@/components/ui/PasswordField";
 import {
   FEELING_MAP as FEELING_TO_BACKEND,
   FEELING_TO_FORM,
   PASSWORD_REGEX,
   extractError,
+  fieldErrorClass,
+  validateAnamnese,
 } from "@/lib/anamnese.constants";
+import { cn } from "@/lib/utils";
 import type {
   Anamnese,
   AnamneseRequest,
@@ -36,6 +33,11 @@ type Section = "pessoal" | "anamnese";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Marcador visual de campo obrigatório (C-02). */
+const Required = () => (
+  <span className="text-red-600" aria-hidden="true"> *</span>
+);
 
 const EditProfileModal = ({ open, onClose }: Props) => {
   const [section, setSection] = useState<Section>("pessoal");
@@ -174,30 +176,30 @@ const textareaClass = (editing: boolean) =>
 
 const PessoalSection = () => {
   const { user, setUser } = useAuth();
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
-  const [showPwd, setShowPwd] = useState(false);
-  const [showPwd2, setShowPwd2] = useState(false);
 
   const [username, setUsername] = useState(user?.username ?? "");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const handleUpdate = async () => {
     setError(null);
-    setSuccess(false);
 
     if (password) {
       if (!PASSWORD_REGEX.test(password)) {
-        setError(
-          "A senha precisa de no mínimo 8 caracteres, com maiúscula, minúscula e número.",
-        );
+        const message =
+          "A senha precisa de no mínimo 8 caracteres, com maiúscula, minúscula e número.";
+        setError(message);
+        toast({ variant: "error", description: message });
         return;
       }
       if (password !== confirm) {
-        setError("As senhas não coincidem.");
+        const message = "As senhas não coincidem.";
+        setError(message);
+        toast({ variant: "error", description: message });
         return;
       }
     }
@@ -217,7 +219,7 @@ const PessoalSection = () => {
       setUser(updated);
       setPassword("");
       setConfirm("");
-      setSuccess(true);
+      toast({ variant: "success", description: "Perfil atualizado com sucesso." });
       setEditing(false);
     } catch (err) {
       setError(extractError(err, "Não foi possível atualizar o perfil."));
@@ -239,20 +241,16 @@ const PessoalSection = () => {
           {error}
         </div>
       )}
-      {success && (
-        <div className="mb-4 rounded-md bg-foodguard-100 px-4 py-2 text-sm font-medium text-foodguard-600">
-          Perfil atualizado com sucesso.
-        </div>
-      )}
 
       <div className="grid gap-8 sm:grid-cols-[1fr_auto] sm:items-start">
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-black">
+            <label htmlFor="perfil-nome" className="block text-sm font-semibold text-black">
               Nome
             </label>
             <div className="relative">
               <input
+                id="perfil-nome"
                 type="text"
                 value={user?.name ?? ""}
                 disabled
@@ -263,11 +261,12 @@ const PessoalSection = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-black">
+            <label htmlFor="perfil-usuario" className="block text-sm font-semibold text-black">
               Seu usuário
             </label>
             <div className="relative">
               <input
+                id="perfil-usuario"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -279,11 +278,12 @@ const PessoalSection = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-black">
+            <label htmlFor="perfil-email" className="block text-sm font-semibold text-black">
               Seu email
             </label>
             <div className="relative">
               <input
+                id="perfil-email"
                 type="email"
                 value={user?.email ?? ""}
                 disabled
@@ -300,60 +300,31 @@ const PessoalSection = () => {
       </div>
 
       <div className="mt-6 grid gap-6 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-black">
-            Nova senha
-          </label>
-          <div className="relative">
-            <input
-              type={showPwd ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder={
-                editing ? "Deixe em branco para manter" : "************"
-              }
-              disabled={!editing}
-              className={fieldClass(editing)}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPwd((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-800 hover:text-black"
-            >
-              {showPwd ? (
-                <EyeOff className="h-5 w-5" />
-              ) : (
-                <Eye className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
+        <PasswordField
+          label="Nova senha"
+          value={password}
+          onChange={setPassword}
+          disabled={!editing}
+          autoComplete="new-password"
+          placeholder={editing ? "Deixe em branco para manter" : "************"}
+          inputClassName={fieldClass(editing)}
+          showStrength
+        />
 
-        <div className="space-y-2">
-          <label className="block text-sm font-semibold text-black">
-            Confirmar a senha
-          </label>
-          <div className="relative">
-            <input
-              type={showPwd2 ? "text" : "password"}
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              disabled={!editing}
-              className={fieldClass(editing)}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPwd2((s) => !s)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-800 hover:text-black"
-            >
-              {showPwd2 ? (
-                <EyeOff className="h-5 w-5" />
-              ) : (
-                <Eye className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
+        <PasswordField
+          label="Confirmar a senha"
+          value={confirm}
+          onChange={setConfirm}
+          disabled={!editing}
+          autoComplete="new-password"
+          placeholder={editing ? "Repita a nova senha" : "************"}
+          inputClassName={fieldClass(editing)}
+          error={
+            confirm.length > 0 && confirm !== password
+              ? "As senhas não coincidem."
+              : undefined
+          }
+        />
       </div>
 
       <div className="mt-10 flex justify-end">
@@ -369,12 +340,23 @@ const PessoalSection = () => {
   );
 };
 
+const ANAMNESE_FIELD_IDS: Record<string, string> = {
+  objetivo: "perfil-objetivo",
+  alergia: "perfil-alergia",
+  intolerancia: "perfil-intolerancia",
+  doencas: "perfil-doencas",
+  medicamentos: "perfil-medicamentos",
+  pref: "perfil-pref",
+  naoGosta: "perfil-nao-gosta",
+};
+
 const AnamneseSection = () => {
+  const { toast } = useToast();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [errorField, setErrorField] = useState<string | null>(null);
 
   const [consulta, setConsulta] = useState("nao");
   const [objetivo, setObjetivo] = useState("");
@@ -427,17 +409,29 @@ const AnamneseSection = () => {
 
   const handleUpdate = async () => {
     setError(null);
-    setSuccess(false);
 
     const isPrevious = consulta === "sim";
-    if (isPrevious && !objetivo.trim()) {
-      setError("Informe o objetivo da consulta prévia com nutricionista.");
+
+    const validationError = validateAnamnese({
+      consulta,
+      objetivo,
+      alergia,
+      intolerancia: intol,
+      doencas,
+      medicamentos,
+      pref,
+      naoGosta,
+    });
+    if (validationError) {
+      setErrorField(validationError.field);
+      setError(validationError.message);
+      toast({ variant: "error", description: validationError.message });
+      document
+        .getElementById(ANAMNESE_FIELD_IDS[validationError.field])
+        ?.focus();
       return;
     }
-    if (!pref.trim()) {
-      setError("Informe ao menos um alimento de preferência.");
-      return;
-    }
+    setErrorField(null);
 
     const payload: AnamneseRequest = {
       previous_consultation: isPrevious,
@@ -445,12 +439,12 @@ const AnamneseSection = () => {
       previous_consultation_result: isPrevious
         ? resultado.trim() || null
         : null,
-      disease_history: doencas.trim() || null,
-      medications: medicamentos.trim() || null,
-      food_allergies: alergia.trim() || null,
-      food_intolerances: intol.trim() || null,
+      disease_history: doencas.trim(),
+      medications: medicamentos.trim(),
+      food_allergies: alergia.trim(),
+      food_intolerances: intol.trim(),
       favorite_foods: pref.trim(),
-      food_aversions: naoGosta.trim() || null,
+      food_aversions: naoGosta.trim(),
       body_feeling: FEELING_TO_BACKEND[sent] ?? null,
       eating_style: veg,
       alcohol_intake: alcool === "sim",
@@ -461,7 +455,11 @@ const AnamneseSection = () => {
     try {
       const updated = await anamneseService.atualizar(payload);
       applyAnamnese(updated);
-      setSuccess(true);
+      toast({
+        variant: "success",
+        description:
+          "Formulário de saúde atualizado. Suas conversas serão recarregadas.",
+      });
       setEditing(false);
       // RN004: a atualização invalida os chats antigos no backend — sinaliza a UI de chat para recarregar.
       window.dispatchEvent(new Event(ANAMNESE_UPDATED_EVENT));
@@ -476,6 +474,16 @@ const AnamneseSection = () => {
 
   const d = !editing;
 
+  // onChange que limpa o realce de erro do próprio campo ao ser editado.
+  const fieldProps = (key: string, setter: (v: string) => void) => ({
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setter(e.target.value);
+      if (errorField === key) setErrorField(null);
+    },
+    "aria-invalid": errorField === key || undefined,
+    className: cn(textareaClass(editing), errorField === key && fieldErrorClass),
+  });
+
   return (
     <>
       <EditHeader
@@ -489,11 +497,6 @@ const AnamneseSection = () => {
           {error}
         </div>
       )}
-      {success && (
-        <div className="mb-4 rounded-md bg-foodguard-100 px-4 py-2 text-sm font-medium text-foodguard-600">
-          Formulário de saúde atualizado. Suas conversas serão recarregadas.
-        </div>
-      )}
 
       {loading ? (
         <div className="flex h-40 items-center justify-center">
@@ -503,6 +506,9 @@ const AnamneseSection = () => {
         </div>
       ) : (
         <>
+          <p className="mb-4 text-xs text-gray-700">
+            Campos marcados com <span className="text-red-600">*</span> são obrigatórios.
+          </p>
           <div className="grid gap-x-8 gap-y-6 sm:grid-cols-2">
             <div className="space-y-3">
               <p className="text-sm font-semibold text-black">
@@ -531,15 +537,16 @@ const AnamneseSection = () => {
             {consulta === "sim" ? (
               <>
                 <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-black">
-                    Qual era o objetivo na época?
+                  <label htmlFor="perfil-objetivo" className="block text-sm font-semibold text-black">
+                    Qual era o objetivo na época?<Required />
                   </label>
                   <textarea
+                    id="perfil-objetivo"
                     rows={3}
                     disabled={d}
+                    aria-required="true"
                     value={objetivo}
-                    onChange={(e) => setObjetivo(e.target.value)}
-                    className={textareaClass(editing)}
+                    {...fieldProps("objetivo", setObjetivo)}
                   />
                 </div>
 
@@ -559,80 +566,86 @@ const AnamneseSection = () => {
             ) : null}
 
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                Possui alergia a algum alimento? Se sim, qual?
+              <label htmlFor="perfil-alergia" className="block text-sm font-semibold text-black">
+                Possui alergia a algum alimento? Se sim, qual?<Required />
               </label>
               <textarea
+                id="perfil-alergia"
                 rows={3}
                 disabled={d}
+                aria-required="true"
                 value={alergia}
-                onChange={(e) => setAlergia(e.target.value)}
-                className={textareaClass(editing)}
+                {...fieldProps("alergia", setAlergia)}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                Você possui histórico de doenças? Se sim, quais?
+              <label htmlFor="perfil-doencas" className="block text-sm font-semibold text-black">
+                Você possui histórico de doenças? Se sim, quais?<Required />
               </label>
               <textarea
+                id="perfil-doencas"
                 rows={3}
                 disabled={d}
+                aria-required="true"
                 value={doencas}
-                onChange={(e) => setDoencas(e.target.value)}
-                className={textareaClass(editing)}
+                {...fieldProps("doencas", setDoencas)}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                Faz uso de algum medicamento? Se sim, qual?
+              <label htmlFor="perfil-medicamentos" className="block text-sm font-semibold text-black">
+                Faz uso de algum medicamento? Se sim, qual?<Required />
               </label>
               <textarea
+                id="perfil-medicamentos"
                 rows={3}
                 disabled={d}
+                aria-required="true"
                 value={medicamentos}
-                onChange={(e) => setMedicamentos(e.target.value)}
-                className={textareaClass(editing)}
+                {...fieldProps("medicamentos", setMedicamentos)}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                Tem intolerância a algum alimento? Se sim, qual?
+              <label htmlFor="perfil-intolerancia" className="block text-sm font-semibold text-black">
+                Tem intolerância a algum alimento? Se sim, qual?<Required />
               </label>
               <textarea
+                id="perfil-intolerancia"
                 rows={3}
                 disabled={d}
+                aria-required="true"
                 value={intol}
-                onChange={(e) => setIntol(e.target.value)}
-                className={textareaClass(editing)}
+                {...fieldProps("intolerancia", setIntol)}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                Alimentos que você tem preferência?
+              <label htmlFor="perfil-pref" className="block text-sm font-semibold text-black">
+                Alimentos que você tem preferência?<Required />
               </label>
               <textarea
+                id="perfil-pref"
                 rows={3}
                 disabled={d}
+                aria-required="true"
                 value={pref}
-                onChange={(e) => setPref(e.target.value)}
-                className={textareaClass(editing)}
+                {...fieldProps("pref", setPref)}
               />
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-black">
-                Alimentos que você não gosta?
+              <label htmlFor="perfil-nao-gosta" className="block text-sm font-semibold text-black">
+                Alimentos que você não gosta?<Required />
               </label>
               <textarea
+                id="perfil-nao-gosta"
                 rows={3}
                 disabled={d}
+                aria-required="true"
                 value={naoGosta}
-                onChange={(e) => setNaoGosta(e.target.value)}
-                className={textareaClass(editing)}
+                {...fieldProps("naoGosta", setNaoGosta)}
               />
             </div>
 

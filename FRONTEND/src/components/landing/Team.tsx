@@ -1,12 +1,49 @@
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import fotoAristoteles from "@/assets/team/Ari.jpg";
+import fotoPedro from "@/assets/team/Otavio.jpeg";
+import fotoVictor from "@/assets/team/Timbo.jpeg";
+import fotoGabriel from "@/assets/team/Pinheiro.jpeg";
+import fotoPaulo from "@/assets/team/Paulo.jpeg";
 
-const members = [
-  { name: "Aristóteles Feitosa", role: "Desenvolvedor Backend", initials: "AF" },
-  { name: "Pedro Otávio de Sousa Bezerra", role: "Desenvolvedor Frontend", initials: "PB" },
-  { name: "Victor Manoel Magalhães Timbó", role: "Desenvolvedor Frontend", initials: "VT" },
-  { name: "Gabriel Pinheiro", role: "Requisitos e Qualidade", initials: "GP" },
-  { name: "Paulo Matheus", role: "Requisitos e Qualidade", initials: "PM" },
+type Member = {
+  name: string;
+  role: string;
+  initials: string;
+  photo?: string;
+};
+
+const members: Member[] = [
+  {
+    name: "Aristóteles Feitosa",
+    role: "Desenvolvedor Backend",
+    initials: "AF",
+    photo: fotoAristoteles,
+  },
+  {
+    name: "Pedro Otávio de Sousa Bezerra",
+    role: "Desenvolvedor Frontend",
+    initials: "PB",
+    photo: fotoPedro,
+  },
+  {
+    name: "Victor Manoel Magalhães Timbó",
+    role: "Desenvolvedor Frontend",
+    initials: "VT",
+    photo: fotoVictor,
+  },
+  {
+    name: "Gabriel Pinheiro",
+    role: "Requisitos e Qualidade",
+    initials: "GP",
+    photo: fotoGabriel,
+  },
+  {
+    name: "Paulo Matheus",
+    role: "Requisitos e Qualidade",
+    initials: "PM",
+    photo: fotoPaulo,
+  },
 ];
 
 export function Team() {
@@ -33,9 +70,17 @@ export function Team() {
               className="flex flex-col items-center gap-4 border-zinc-200 p-6 transition-all hover:-translate-y-1 hover:border-foodguard-400/40 hover:shadow-md"
             >
               <Avatar className="h-20 w-20 ring-2 ring-foodguard-500/20">
-                <AvatarFallback className="bg-foodguard-50 text-base font-semibold text-foodguard-600">
-                  {m.initials}
-                </AvatarFallback>
+                {m.photo ? (
+                  <img
+                    src={m.photo}
+                    alt={m.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <AvatarFallback className="bg-foodguard-50 text-base font-semibold text-foodguard-600">
+                    {m.initials}
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div className="text-center">
                 <p className="text-sm font-semibold text-black">{m.name}</p>

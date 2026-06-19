@@ -254,13 +254,18 @@ def _format_food_data(food_data: dict | None) -> str:
 
 
 def _chat_title(food_data: dict | None, fallback: str) -> str:
-    """Título do chat: nome do produto escaneado quando disponível, senão o
-    início da mensagem do usuário."""
+    """Título do chat: nome do produto escaneado quando disponível, senão a
+    mensagem do usuário truncada até a 4ª palavra (sem quebrar palavras),
+    com reticências quando houver mais palavras."""
     if food_data:
         name = (food_data.get('product', {}).get('product_name') or "").strip()
         if name:
             return name[:255]
-    return fallback[:15]
+    words = fallback.split()
+    title = " ".join(words[:4])
+    if len(words) > 4:
+        title += "..."
+    return title[:255]
 
 
 def _food_image_url(food_data: dict | None) -> str:

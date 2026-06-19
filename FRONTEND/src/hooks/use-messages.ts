@@ -19,6 +19,14 @@ export interface Message {
 // Chave temporária de um chat ainda não persistido no backend (não deve gerar fetch).
 const NEW_CHAT_KEY = "__new__";
 
+/** Trunca o texto até a 4ª palavra (sem quebrar palavras), com reticências
+ * quando houver mais. Espelha o `_chat_title` do backend. */
+function truncateTitle(text: string): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const title = words.slice(0, 4).join(" ");
+  return words.length > 4 ? `${title}...` : title;
+}
+
 function mapRole(role: MessageRole): "user" | "assistant" {
   return role === MessageRole.User ? "user" : "assistant";
 }
@@ -152,11 +160,11 @@ export const useMessages = (
         const resolvedChatId = res.chat_id;
 
         if (!currentChatId) {
-          // Título: nome do produto escaneado quando houver, senão a mensagem.
-          const title = (productName || finalMessage || "Nova conversa").slice(
-            0,
-            28,
-          );
+          // Título otimista alinhado ao backend (_chat_title): nome do produto
+          // escaneado quando houver, senão a mensagem truncada até a 4ª palavra.
+          const title = productName
+            ? productName.slice(0, 255)
+            : truncateTitle(finalMessage) || "Nova conversa";
           addChat({
             id: resolvedChatId,
             title,
